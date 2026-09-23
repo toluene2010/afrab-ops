@@ -131,16 +131,16 @@
 
 <script>
 // ============================================================
-// SPREADSHEET + TAB NAMES (case-sensitive)
+// SPREADSHEET + TAB NAMES (all lowercase except Products)
 // ============================================================
 const SPREADSHEET_ID = "1mwo5IXXrIu4bnqR8GOV1qNxQ31rdfdUjeLfBQf22t1M";
 
 const SHEETS = {
   products:      "Drug database",
-  raw_materials: "Raw_Materials",
+  raw_materials: "raw_materials",
   bom:           "bom",
-  machines:      "Machines",
-  operators:     "Operators",
+  machines:      "machines",
+  operators:     "operators",
 };
 
 // ============================================================
@@ -280,7 +280,9 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA JSONP (gviz/tq) — bypasses CORS
+// FETCH VIA JSONP (gviz/tq)
+// Robust: uses gviz labels if present, otherwise extracts
+// the header row manually from the first data row.
 // ============================================================
 const fetchLog = {};
 
@@ -310,22 +312,39 @@ function fetchSheet(sheetName){
           reject(new Error("Invalid response"));
           return;
         }
-        const cols = (data.table.cols || []).map(c => String(c.label || c.id || "").trim());
-        const rows = (data.table.rows || []).map(row => {
+
+        // Convert all cells to raw strings
+        const rawRows = (data.table.rows || []).map(row =>
+          (row.c || []).map(cell => {
+            if(!cell) return "";
+            if(cell.f !== undefined && cell.f !== null) return String(cell.f);
+            if(cell.v !== undefined && cell.v !== null) return String(cell.v);
+            return "";
+          })
+        );
+
+        // Check if gviz gave meaningful column labels
+        const cols = (data.table.cols || []).map(c => String(c.label || "").trim());
+        const haveLabels = cols.length > 0 && cols.some(l => l && /[a-z]/i.test(l));
+
+        let headers, dataRows;
+        if (haveLabels) {
+          headers = cols;
+          dataRows = rawRows;
+        } else {
+          // First row is the header row
+          const copy = rawRows.slice();
+          headers = (copy.shift() || []).map(h => String(h).trim());
+          dataRows = copy;
+        }
+
+        const rows = dataRows.map(r => {
           const obj = {};
-          (row.c || []).forEach((cell, i) => {
-            const key = cols[i];
-            if(!key) return;
-            let val = "";
-            if(cell){
-              if(cell.f !== undefined && cell.f !== null) val = cell.f;
-              else if(cell.v !== undefined && cell.v !== null) val = cell.v;
-            }
-            obj[key] = val === null || val === undefined ? "" : String(val);
-          });
+          headers.forEach((h, i) => { if(h) obj[h] = r[i] || ""; });
           return obj;
         });
-        fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + cols.length;
+
+        fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + headers.length + " mode=" + (haveLabels ? "gviz" : "manual");
         cleanup();
         resolve(rows);
       } catch(err){
@@ -523,7 +542,7 @@ function saveCompanyInfo(){
 }
 
 // ============================================================
-// WEIGHING — product picker
+// WEIGHING
 // ============================================================
 async function renderWeighingProductPicker(){
   const c=document.getElementById("module-content");
@@ -535,10 +554,8 @@ async function renderWeighingProductPicker(){
     c.innerHTML=`<div class="info-banner">
       ${productsWithBOM.size} of ${products.length} products have a BOM.
       <div style="font-size:11px;opacity:0.8;margin-top:8px;font-family:monospace">
-        BOM tab: "${esc(SHEETS.bom)}"<br>
-        BOM log: ${esc(fetchLog[SHEETS.bom] || "(none)")}<br>
-        Raw_Materials tab: "${esc(SHEETS.raw_materials)}"<br>
-        Raw log: ${esc(fetchLog[SHEETS.raw_materials] || "(none)")}
+        BOM: ${esc(fetchLog[SHEETS.bom] || "(none)")}<br>
+        Raw: ${esc(fetchLog[SHEETS.raw_materials] || "(none)")}
       </div>
     </div>
     <input class="search" id="w-search" placeholder="Search product…"/>
@@ -618,9 +635,7 @@ async function showWeighingForProduct(productCode){
   if(materials.length === 0){
     html += `<div class="empty"><b>BOM not yet added for this product.</b><br><br>
       <span style="font-size:12px">BOM rows in memory: ${state.bom.length}<br>
-      Raw materials in memory: ${state.rawMaterials.length}<br>
-      BOM log: ${esc(fetchLog[SHEETS.bom] || "(none)")}<br>
-      Raw log: ${esc(fetchLog[SHEETS.raw_materials] || "(none)")}</span></div>`;
+      Raw rows in memory: ${state.rawMaterials.length}</span></div>`;
     c.innerHTML = html; return;
   }
   materials.forEach((m, idx)=>{
