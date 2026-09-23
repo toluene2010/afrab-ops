@@ -131,11 +131,11 @@
 
 <script>
 // ============================================================
-// APPS SCRIPT WEB APP URL
+// SPREADSHEET — your master sheet ID
 // ============================================================
-const API_BASE = "https://script.google.com/macros/s/AKfycbwKkCOGWDXDDtD_bpUeqS99S4ytOYUpcq8n4gOPImZu4e45WCuGOH2ZNv0gIgwJE0NjDw/exec";
+const SPREADSHEET_ID = "1mwo5IXXrIu4bnqR8GOV1qNxQ31rdfdUjeLfBQf22t1M";
 
-// Sheet name map — matches your real tab names
+// Tab names in the sheet (exact)
 const SHEETS = {
   products:      "Drug database",
   raw_materials: "Raw_Materials",
@@ -282,40 +282,43 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA CORS PROXY (fixes Apps Script redirect block)
+// FETCH — uses Google gviz/tq (no CORS, no proxies, no Apps Script)
 // ============================================================
 const fetchLog = {};
 
 async function fetchSheet(sheetName){
-  const url = API_BASE + "?sheet=" + encodeURIComponent(sheetName);
-  const proxies = [
-    u => u,
-    u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u),
-    u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
-    u => "https://everyorigin.jwvbremen.nl/api/get?url=" + encodeURIComponent(u),
-  ];
-  const log = [];
-  for(let i=0;i<proxies.length;i++){
-    try{
-      const finalUrl = proxies[i](url);
-      const r = await fetch(finalUrl, {cache:"no-store"});
-      const txt = await r.text();
-      log.push(`[${i}] ${r.status} len=${txt.length}`);
-      if(r.ok && txt && txt.length > 5){
-        const data = JSON.parse(txt);
-        if(data.error){
-          fetchLog[sheetName] = log.join(" | ") + ` | SERVER: ${data.error}`;
-          return data;
+  const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
+              "/gviz/tq?tqx=out:json&sheet=" + encodeURIComponent(sheetName);
+  try{
+    const r = await fetch(url, {cache: "no-store"});
+    const txt = await r.text();
+    fetchLog[sheetName] = "status=" + r.status + " len=" + txt.length;
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const start = txt.indexOf("{");
+    const end = txt.lastIndexOf("}");
+    if(start < 0 || end < 0) throw new Error("No JSON found");
+    const json = JSON.parse(txt.slice(start, end + 1));
+    if(!json.table) throw new Error("No table in response");
+    const cols = (json.table.cols || []).map(c => String(c.label || c.id || "").trim());
+    const rows = (json.table.rows || []).map(row => {
+      const obj = {};
+      (row.c || []).forEach((cell, i) => {
+        const key = cols[i];
+        if(!key) return;
+        let val = "";
+        if(cell){
+          if(cell.f !== undefined && cell.f !== null) val = cell.f;
+          else if(cell.v !== undefined && cell.v !== null) val = cell.v;
         }
-        fetchLog[sheetName] = log.join(" | ");
-        return data;
-      }
-    }catch(e){
-      log.push(`[${i}] ERR ${String(e.message).slice(0,30)}`);
-    }
+        obj[key] = val === null || val === undefined ? "" : String(val);
+      });
+      return obj;
+    });
+    return rows;
+  }catch(e){
+    fetchLog[sheetName] = "ERROR: " + e.message;
+    throw e;
   }
-  fetchLog[sheetName] = log.join(" | ");
-  throw new Error("All fetch attempts failed");
 }
 
 function findKey(obj, ...keywords){
