@@ -138,7 +138,6 @@ const SHEET_URLS = {
   products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
   raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
   bom:           "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=55512345&single=true&output=csv",
-  // OPTIONAL — publish these when ready. Leave as "" if not yet created.
   machines:      "",
   operators:     "",
 };
@@ -190,12 +189,17 @@ function markFinished(code, qc){ localStorage.setItem(getFinishedKey(code, qc), 
 function unmarkFinished(code, qc){ localStorage.removeItem(getFinishedKey(code, qc)); }
 
 // ============================================================
-// SHRINKWRAP PENDING QUEUE
+// LOCAL PENDING QUEUES
 // ============================================================
 function getShrinkPending(){
   try{ return JSON.parse(localStorage.getItem("afrab.shrink.pending")) || []; }catch(e){ return []; }
 }
 function saveShrinkPending(list){ localStorage.setItem("afrab.shrink.pending", JSON.stringify(list)); }
+
+function getCodingPending(){
+  try{ return JSON.parse(localStorage.getItem("afrab.coding.pending")) || []; }catch(e){ return []; }
+}
+function saveCodingPending(list){ localStorage.setItem("afrab.coding.pending", JSON.stringify(list)); }
 
 // ============================================================
 // STATE
@@ -294,6 +298,7 @@ function openModule(id){
   if(id==="admin") renderAdmin();
   else if(id==="weighing") renderWeighingProductPicker();
   else if(id==="shrink") renderShrinkwrap();
+  else if(id==="coding") renderCoding();
   else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
@@ -390,30 +395,26 @@ async function loadBOM(){
 async function loadMachines(){
   if(state.machines.length) return state.machines;
   if(!SHEET_URLS.machines){
-    state.machines = ["Machine 1","Machine 2","Machine 3"]; // fallback
+    state.machines = ["Machine 1","Machine 2","Machine 3"];
     return state.machines;
   }
   try{
     const txt=await fetchCSV(SHEET_URLS.machines);
     const {headers, rows} = parseSimpleCSV(txt);
     const cName = findCol(headers, "machine name","name","machine");
-    const cType = findCol(headers, "type");
     const cActive = findCol(headers, "active");
     state.machines = rows
       .filter(x => x[cName]?.trim())
       .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
-      .map(x => ({name:(x[cName]||"").trim(), type:cType?(x[cType]||"").trim():""}));
+      .map(x => ({name:(x[cName]||"").trim()}));
   }catch(e){
-    state.machines = ["Machine 1","Machine 2","Machine 3"]; // fallback
+    state.machines = ["Machine 1","Machine 2","Machine 3"];
   }
   return state.machines;
 }
 async function loadOperators(){
   if(state.operators.length) return state.operators;
-  if(!SHEET_URLS.operators){
-    state.operators = [];
-    return state.operators;
-  }
+  if(!SHEET_URLS.operators){ state.operators = []; return state.operators; }
   try{
     const txt=await fetchCSV(SHEET_URLS.operators);
     const {headers, rows} = parseSimpleCSV(txt);
@@ -428,7 +429,7 @@ async function loadOperators(){
 }
 
 // ============================================================
-// ADMIN PRODUCTS
+// ADMIN
 // ============================================================
 async function renderAdmin(){
   const c=document.getElementById("module-content");
@@ -497,8 +498,7 @@ async function renderWeighingProductPicker(){
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
     if(products.length === 0){
-      const log = fetchLog[SHEET_URLS.products] || "(no log)";
-      c.innerHTML=`<div class="err-banner">Products failed to load.\n\n${log}</div>
+      c.innerHTML=`<div class="err-banner">Products failed to load.</div>
         <button class="back-btn" onclick="goHome()">← Back</button>`;
       return;
     }
@@ -614,7 +614,7 @@ async function showWeighingForProduct(productCode){
   c.innerHTML = html;
 }
 function confirmMarkFinished(code, qc, batch){
-  const msg = `Mark this batch as finished?\n\nMaterial: ${code}\nQC No: ${qc||"—"}\nBatch: ${batch||"—"}\n\nIt will be hidden from this phone.`;
+  const msg = `Mark this batch as finished?\n\nMaterial: ${code}\nQC No: ${qc||"—"}\nBatch: ${batch||"—"}`;
   if(confirm(msg)){
     markFinished(code, qc);
     setStatus("Marked finished");
@@ -629,7 +629,7 @@ function showFinishedBatch(code){
     const sheetFin = (r.status||"").toLowerCase() === "finished";
     const localFin = isLocallyFinished(r.code, r.qc);
     if(sheetFin || localFin){
-      msg += `• QC ${r.qc||"—"} | Batch ${r.batch||"—"} | Exp ${r.exp||"—"}\n  [${sheetFin?"Sheet":"Local"} finished]\n\n`;
+      msg += `• QC ${r.qc||"—"} | Batch ${r.batch||"—"} | Exp ${r.exp||"—"}\n  [${sheetFin?"Sheet":"Local"}]\n\n`;
     }
   });
   const restore = confirm(msg + "\nRestore ALL local-finished batches?");
@@ -687,7 +687,7 @@ function printBOM(productCode){
 }
 
 // ============================================================
-// GENERIC PICKER (modal)
+// GENERIC PICKER
 // ============================================================
 function openPicker(title, items, allowCustom){
   return new Promise(resolve => {
@@ -709,13 +709,9 @@ function openPicker(title, items, allowCustom){
       const raw = (q||"").trim();
       const query = raw.toLowerCase();
       const filtered = query ? items.filter(x => x.toLowerCase().includes(query)) : items;
-      let html = "";
-      if(filtered.length === 0){
-        html += `<div class="empty" style="padding:20px">No matches.</div>`;
-      } else {
-        html = filtered.map(x => `<div class="product-item" data-v="${esc(x)}">${esc(x)}</div>`).join("");
-      }
-      // Custom entry option
+      let html = filtered.length
+        ? filtered.map(x => `<div class="product-item" data-v="${esc(x)}">${esc(x)}</div>`).join("")
+        : `<div class="empty" style="padding:20px">No matches.</div>`;
       if(allowCustom && raw && !items.some(x=>x.toLowerCase()===query)){
         html += `<div class="product-item" data-v="${esc(raw)}" style="border-color:var(--accent);color:var(--accent)">+ Use "${esc(raw)}"</div>`;
       }
@@ -732,9 +728,10 @@ function openPicker(title, items, allowCustom){
 }
 
 // ============================================================
-// SHRINKWRAP MODULE
+// REUSABLE BATCH ENTRY FORM (for Shrinkwrap & Coding)
 // ============================================================
-async function renderShrinkwrap(){
+async function renderBatchEntry(opts){
+  // opts: { moduleTitle, storageGet, storageSave, pendingLabel, machineFallback, qtyLabel }
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading products, machines, operators…</div>`;
   try{
@@ -744,10 +741,9 @@ async function renderShrinkwrap(){
         <button class="back-btn" onclick="goHome()">← Back</button>`;
       return;
     }
-    const machineNames = machines.map(m => m.name || m);
+    const machineNames = (machines.length ? machines : [{name:opts.machineFallback}]).map(m => m.name || m);
     const operatorNames = operators.map(o => o.name || o);
 
-    // In-memory list of entries for this session
     let entries = [{ product:"", productCode:"", batch:"", machine:"", operator:"", qty:"" }];
     let date = new Date().toISOString().slice(0,10);
 
@@ -797,7 +793,7 @@ async function renderShrinkwrap(){
             </button>
           </div>
           <div class="entry-row">
-            <label>Quantity Shrinkwrapped</label>
+            <label>${esc(opts.qtyLabel)}</label>
             <input data-qty="${i}" type="number" inputmode="numeric" value="${esc(e.qty)}" placeholder="e.g. 500"/>
           </div>
         </div>
@@ -814,11 +810,7 @@ async function renderShrinkwrap(){
           if(picked){
             const code = picked.split(" — ")[0];
             const found = products.find(p => p.code === code);
-            if(found){
-              entries[i].product = found.name;
-              entries[i].productCode = found.code;
-              renderEntries();
-            }
+            if(found){ entries[i].product = found.name; entries[i].productCode = found.code; renderEntries(); }
           }
         };
       });
@@ -844,7 +836,6 @@ async function renderShrinkwrap(){
           renderEntries();
         };
       });
-      // Live text inputs
       entriesBox.querySelectorAll("[data-batch]").forEach(inp => {
         inp.oninput = e => { entries[+e.target.getAttribute("data-batch")].batch = e.target.value; };
       });
@@ -854,11 +845,8 @@ async function renderShrinkwrap(){
     };
 
     const renderPending = () => {
-      const pending = getShrinkPending();
-      if(pending.length === 0){
-        pendingBox.innerHTML = "";
-        return;
-      }
+      const pending = opts.storageGet();
+      if(pending.length === 0){ pendingBox.innerHTML = ""; return; }
       pendingBox.innerHTML = `
         <div class="info-banner">${pending.length} pending entr${pending.length===1?"y":"ies"} saved on this phone.</div>
         ${pending.map((p, i) => `
@@ -869,7 +857,7 @@ async function renderShrinkwrap(){
               <div><b>Batch:</b> ${esc(p.batch)}</div>
               <div><b>Machine:</b> ${esc(p.machine)}</div>
               <div><b>Operator:</b> ${esc(p.operator)}</div>
-              <div><b>Qty:</b> ${esc(p.qty)}</div>
+              <div><b>${esc(opts.qtyLabel)}:</b> ${esc(p.qty)}</div>
             </div>
           </div>
         `).join("")}
@@ -878,22 +866,20 @@ async function renderShrinkwrap(){
       pendingBox.querySelectorAll("[data-del]").forEach(btn => {
         btn.onclick = () => {
           const i = +btn.getAttribute("data-del");
-          const list = getShrinkPending();
+          const list = opts.storageGet();
           list.splice(i, 1);
-          saveShrinkPending(list);
+          opts.storageSave(list);
           renderPending();
         };
       });
       const exp = pendingBox.querySelector("#swExport");
       if(exp) exp.onclick = () => {
-        const list = getShrinkPending();
+        const list = opts.storageGet();
         const txt = list.map(p => `${p.date}\t${p.productCode||p.product}\t${p.batch}\t${p.machine}\t${p.operator}\t${p.qty}`).join("\n");
         navigator.clipboard.writeText(txt).then(()=>{
           setStatus("Copied to clipboard");
-          alert("Copied " + list.length + " entries to clipboard.\n\nYou can paste into WhatsApp, email, or a sheet.");
-        }).catch(()=>{
-          alert("Entries:\n\n" + txt);
-        });
+          alert("Copied " + list.length + " entries to clipboard.");
+        }).catch(()=>{ alert("Entries:\n\n" + txt); });
       };
     };
 
@@ -904,38 +890,58 @@ async function renderShrinkwrap(){
 
     root.querySelector("#swSave").onclick = () => {
       const d = root.querySelector("#swDate").value || date;
-      // Validate
       const valid = entries.filter(e => e.product && e.batch && e.machine && e.operator && e.qty);
       if(valid.length === 0){
         alert("Fill in at least one complete entry.\n\nRequired: Product, Batch No, Machine, Operator, Quantity.");
         return;
       }
       const toSave = valid.map(e => ({
-        date: d,
-        product: e.product,
-        productCode: e.productCode,
-        batch: e.batch,
-        machine: e.machine,
-        operator: e.operator,
-        qty: e.qty,
-        savedAt: new Date().toISOString(),
+        date: d, product: e.product, productCode: e.productCode,
+        batch: e.batch, machine: e.machine, operator: e.operator,
+        qty: e.qty, savedAt: new Date().toISOString(),
       }));
-      const existing = getShrinkPending();
-      saveShrinkPending(existing.concat(toSave));
+      const existing = opts.storageGet();
+      opts.storageSave(existing.concat(toSave));
       setStatus(`Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} locally`);
       entries = [{product:"",productCode:"",batch:"",machine:"",operator:"",qty:""}];
       renderEntries();
       renderPending();
-      alert(`✅ Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} on this phone.\n\nThey will appear in the Pending section below. When the Google Sheet endpoint is ready, these will be pushed automatically.`);
+      alert(`✅ Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} on this phone.`);
     };
 
     renderEntries();
     renderPending();
-    setStatus("Shrinkwrap ready");
+    setStatus(opts.moduleTitle + " ready");
   } catch(err){
     c.innerHTML = `<div class="err-banner">Failed to load: ${err.message}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
+}
+
+// ============================================================
+// SHRINKWRAP MODULE
+// ============================================================
+async function renderShrinkwrap(){
+  await renderBatchEntry({
+    moduleTitle: "Shrinkwrap",
+    storageGet: getShrinkPending,
+    storageSave: saveShrinkPending,
+    machineFallback: ["Machine 1","Machine 2","Machine 3"],
+    qtyLabel: "Quantity Shrinkwrapped",
+  });
+}
+
+// ============================================================
+// CODING MODULE
+// ============================================================
+async function renderCoding(){
+  await renderBatchEntry({
+    moduleTitle: "Coding",
+    storageGet: getCodingPending,
+    storageSave: saveCodingPending,
+    machineFallback: ["Coder 1","Coder 2","Coder 3","Coder 4","Coder 5"],
+    qtyLabel: "Quantity Coded",
+  });
 }
 
 // ============================================================
