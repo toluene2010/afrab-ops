@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>AFRAB Operations</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{--bg:#0f172a;--panel:#1e293b;--border:#334155;--text:#e2e8f0;--dim:#94a3b8;--accent:#0ea5e9;--green:#22c55e;--orange:#f59e0b;--red:#ef4444}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
+  .screen{display:none;padding:16px 16px 60px 16px}
+  .screen.active{display:block}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  h1{font-size:20px;margin:0;color:var(--accent)}
+  .role-pill{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer}
+  .role-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px}
+  .role-btn{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:16px;color:var(--text);text-align:left;cursor:pointer}
+  .role-btn:active{transform:scale(.97)}
+  .modules{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .module{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:left;cursor:pointer;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;color:var(--text)}
+  .module:active{transform:scale(.97)}
+  .module .icon{font-size:26px}
+  .module .label{font-size:14px;font-weight:600;margin-top:10px}
+  .module .sub{font-size:11px;color:var(--dim);margin-top:4px}
+  .module.packing{border-color:#2563eb}.module.filling{border-color:#14b8a6}
+  .module.receipt{border-color:#f59e0b}.module.batch{border-color:#8b5cf6}
+  .module.shrink{border-color:#ec4899}.module.coding{border-color:#22c55e}
+  .module.weighing{border-color:#0ea5e9}.module.admin{border-color:#64748b}
+  .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+  .product-item .code{color:var(--dim);font-size:12px;font-family:monospace}
+  .product-item .name{font-size:14px;margin-top:4px}
+  .search{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);margin-bottom:12px}
+  .search:focus{outline:none;border-color:var(--accent)}
+  .back-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:13px;cursor:pointer;margin-bottom:16px}
+  .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
+  .loading{text-align:center;padding:40px 20px;color:var(--dim)}
+  .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:10px 16px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
+  .dot.offline{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div id="screen-role" class="screen active">
+  <header><h1>AFRAB Operations</h1></header>
+  <p style="color:var(--dim);font-size:14px;margin-bottom:8px">Welcome. Select your role to continue.</p>
+  <div class="role-grid" id="role-grid"></div>
+</div>
+
+<div id="screen-home" class="screen">
+  <header><h1>AFRAB Operations</h1><div class="role-pill" id="role-pill">—</div></header>
+  <div class="modules" id="modules"></div>
+</div>
+
+<div id="screen-module" class="screen">
+  <button class="back-btn" onclick="goHome()">← Back</button>
+  <h1 id="module-title" style="margin-bottom:16px">Module</h1>
+  <div id="module-content"></div>
+</div>
+
+<div class="status-bar">
+  <span><span id="net-dot" class="dot"></span><span id="net-text">Online</span></span>
+  <span id="status-text">Ready</span>
+</div>
+
+<script>
+// ============================================================
+// YOUR DATA SOURCES
+// ============================================================
+const SHEET_URLS = {
+  // Products tab — your published CSV URL
+  products: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
+};
+
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const state = { role: localStorage.getItem("afrab.role") || null, products: [] };
+
+const ROLES = [
+  { id:"packing",  label:"Packing Supervisor",   icon:"🧴" },
+  { id:"filling",  label:"Filling Supervisor",   icon:"💧" },
+  { id:"receipt",  label:"Product Receiver",     icon:"📥" },
+  { id:"batch",    label:"Production Batch",     icon:"📦" },
+  { id:"shrink",   label:"Label / Shrinkwrap",   icon:"🎞️" },
+  { id:"coding",   label:"Coding Supervisor",    icon:"🏷️" },
+  { id:"weighing", label:"Weighing Staff",       icon:"⚖️" },
+  { id:"admin",    label:"Admin",                icon:"🔧" },
+];
+
+const MODULES = {
+  packing:  { title:"Packing Entry",     sub:"Daily packer output",       color:"packing" },
+  filling:  { title:"Filling Entry",     sub:"Filling line production",   color:"filling" },
+  receipt:  { title:"Product Receipt",   sub:"Receive finished products", color:"receipt" },
+  batch:    { title:"Production Batch",  sub:"Track batch by year",       color:"batch" },
+  shrink:   { title:"Shrink Wrapping",   sub:"Per machine, per day",      color:"shrink" },
+  coding:   { title:"Coding",            sub:"Per coder, per batch",      color:"coding" },
+  weighing: { title:"Weighing",          sub:"Raw materials for a batch", color:"weighing" },
+  admin:    { title:"Admin",             sub:"Products, machines, etc.",  color:"admin" },
+};
+
+const ROLE_MODULES = {
+  packing:["packing"], filling:["filling"], receipt:["receipt"],
+  batch:["batch"], shrink:["shrink"], coding:["coding"],
+  weighing:["weighing"],
+  admin:["packing","filling","receipt","batch","shrink","coding","weighing","admin"],
+};
+
+// ============================================================
+// INIT
+// ============================================================
+function init(){ state.role ? showHome() : showRolePicker(); updateNet(); }
+function updateNet(){
+  const d=document.getElementById("net-dot"), t=document.getElementById("net-text");
+  if(navigator.onLine){d.classList.remove("offline");t.textContent="Online";}
+  else{d.classList.add("offline");t.textContent="Offline";}
+}
+addEventListener("online",updateNet);addEventListener("offline",updateNet);
+
+function setStatus(s){document.getElementById("status-text").textContent=s;}
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0,0);
+}
+
+function showRolePicker(){
+  const g=document.getElementById("role-grid");g.innerHTML="";
+  ROLES.forEach(r=>{
+    const b=document.createElement("button");
+    b.className="role-btn";b.innerHTML=`${r.icon} &nbsp; ${r.label}`;
+    b.onclick=()=>{state.role=r.id;localStorage.setItem("afrab.role",r.id);showHome();};
+    g.appendChild(b);
+  });
+  showScreen("screen-role");
+}
+
+function showHome(){
+  const role=state.role, info=ROLES.find(r=>r.id===role);
+  const pill=document.getElementById("role-pill");
+  pill.textContent=info?info.label:"Unknown";
+  pill.onclick=()=>{if(confirm("Change role?")){state.role=null;localStorage.removeItem("afrab.role");showRolePicker();}};
+  const mods=ROLE_MODULES[role]||[];
+  const grid=document.getElementById("modules");grid.innerHTML="";
+  mods.forEach(m=>{
+    const mi=MODULES[m];
+    const t=document.createElement("button");
+    t.className=`module ${mi.color}`;
+    t.innerHTML=`<div class="icon">${ROLES.find(r=>r.id===m)?.icon||"•"}</div><div><div class="label">${mi.title}</div><div class="sub">${mi.sub}</div></div>`;
+    t.onclick=()=>openModule(m);
+    grid.appendChild(t);
+  });
+  showScreen("screen-home");
+}
+
+function goHome(){showHome();}
+
+function openModule(id){
+  document.getElementById("module-title").textContent=MODULES[id].title;
+  const c=document.getElementById("module-content");
+  c.innerHTML=`<div class="loading">Loading…</div>`;
+  showScreen("screen-module");
+  if(id==="admin") renderAdmin();
+  else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.<br><br>Design is locked. This screen is built after Products loads correctly.</div>`;
+}
+
+// ============================================================
+// PRODUCTS LOADER
+// ============================================================
+async function loadProducts(){
+  if(state.products.length) return state.products;
+  const url=SHEET_URLS.products;
+  if(!url||url.includes("PASTE_")) throw new Error("Products URL not configured");
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const txt=await r.text();
+  state.products=parseCSV(txt);
+  return state.products;
+}
+
+function parseCSV(t){
+  const rows=[];let cur=[],f="",inq=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(inq){if(c==='"'&&t[i+1]==='"'){f+='"';i++;}else if(c==='"')inq=false;else f+=c;}
+    else{if(c==='"')inq=true;else if(c===","){cur.push(f);f="";}
+      else if(c==="\n"){cur.push(f);rows.push(cur);cur=[];f="";}
+      else if(c!=="\r")f+=c;}}
+  if(f||cur.length){cur.push(f);rows.push(cur);}
+  if(!rows.length)return[];
+  // Find the header row
+  const h=rows[0].map(x=>x.trim().toLowerCase());
+  const ci=h.findIndex(x=>x.includes("code"));
+  const ni=h.findIndex(x=>x.includes("name"));
+  const ai=h.findIndex(x=>x.includes("active"));
+  const out=[];
+  for(let i=1;i<rows.length;i++){const r=rows[i];
+    if(!r.length||!r[ci]?.trim())continue;
+    if(ai>=0&&r[ai]?.trim().toUpperCase()==="NO")continue;
+    out.push({code:r[ci].trim(),name:r[ni]?.trim()||""});}
+  return out;
+}
+
+// ============================================================
+// ADMIN — PRODUCTS LIST
+// ============================================================
+async function renderAdmin(){
+  const c=document.getElementById("module-content");
+  c.innerHTML=`<div class="loading">Loading products…</div>`;
+  try{
+    const p=await loadProducts();
+    setStatus(`${p.length} products loaded`);
+    c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/><div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products loaded from sheet</div><div id="prod-list"></div>`;
+    const render=(q="")=>{
+      const list=document.getElementById("prod-list");
+      const query=q.trim().toLowerCase();
+      const items=query?p.filter(x=>x.name.toLowerCase().includes(query)||x.code.toLowerCase().includes(query)):p;
+      list.innerHTML=items.map(x=>`<div class="product-item"><div class="code">${esc(x.code)}</div><div class="name">${esc(x.name)}</div></div>`).join("");
+    };
+    render();
+    document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
+  }catch(err){
+    c.innerHTML=`<div class="empty">Could not load products.<br><br><b>${esc(err.message)}</b><br><br>This usually means the CSV URL is not fully published. Try: File → Share → Publish to web → Products tab → CSV → Publish.</div>`;
+    setStatus("Load failed");
+  }
+}
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+// ============================================================
+// SERVICE WORKER
+// ============================================================
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
+init();
+</script>
+</body>
+</html>
