@@ -41,6 +41,7 @@
   .action-btn.alt{background:#475569}
   .action-btn.green{background:var(--green)}
   .action-btn.red{background:var(--red)}
+  .action-btn.orange{background:var(--orange)}
 
   .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
   .loading{text-align:center;padding:40px 20px;color:var(--dim)}
@@ -48,6 +49,7 @@
   .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:10px 16px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;z-index:10}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
   .dot.offline{background:var(--red)}
+  .dot.busy{background:var(--orange)}
 
   .material-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;border-left:5px solid var(--green);position:relative}
   .material-card.warn{border-left-color:var(--orange)}
@@ -72,6 +74,7 @@
 
   .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
   .err-banner{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
+  .ok-banner{background:#14532d;border:1px solid #22c55e;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#86efac}
 
   .field{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);margin-bottom:10px}
   .field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
@@ -131,9 +134,10 @@
 
 <script>
 // ============================================================
-// SPREADSHEET + TAB NAMES (all lowercase except Products)
+// CONFIG
 // ============================================================
 const SPREADSHEET_ID = "1mwo5IXXrIu4bnqR8GOV1qNxQ31rdfdUjeLfBQf22t1M";
+const API_BASE = "https://script.google.com/macros/s/AKfycbwKkCOGWDXDDtD_bpUeqS99S4ytOYUpcq8n4gOPImZu4e45WCuGOH2ZNv0gIgwJE0NjDw/exec";
 
 const SHEETS = {
   products:      "Drug database",
@@ -141,10 +145,12 @@ const SHEETS = {
   bom:           "bom",
   machines:      "machines",
   operators:     "operators",
+  shrink_log:    "shrinkwrap_log",
+  coding_log:    "coding_log",
 };
 
 // ============================================================
-// COMPANY INFO
+// COMPANY
 // ============================================================
 const COMPANY_DEFAULT = {
   name:    "AFRAB PHARMACEUTICALS LTD",
@@ -219,13 +225,14 @@ const ROLE_MODULES = {
 // ============================================================
 // INIT & NAV
 // ============================================================
-function init(){ state.role ? showHome() : showRolePicker(); updateNet(); }
+function init(){ state.role ? showHome() : showRolePicker(); updateNet(); scheduleAutoSync(); }
 function updateNet(){
   const d=document.getElementById("net-dot"), t=document.getElementById("net-text");
   if(navigator.onLine){d.classList.remove("offline");t.textContent="Online";}
   else{d.classList.add("offline");t.textContent="Offline";}
 }
-addEventListener("online",updateNet);addEventListener("offline",updateNet);
+addEventListener("online",()=>{ updateNet(); autoSyncAll(); });
+addEventListener("offline",updateNet);
 function setStatus(s){document.getElementById("status-text").textContent=s;}
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
@@ -280,40 +287,25 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA JSONP (gviz/tq)
-// Robust: uses gviz labels if present, otherwise extracts
-// the header row manually from the first data row.
+// FETCH VIA JSONP (gviz)
 // ============================================================
 const fetchLog = {};
-
 function fetchSheet(sheetName){
   return new Promise((resolve, reject) => {
     const cb = "gviz_cb_" + Math.random().toString(36).slice(2);
-    let done = false;
-    let script = null;
+    let done = false, script = null;
     const cleanup = () => {
-      if (done) return;
-      done = true;
+      if (done) return; done = true;
       try { delete window[cb]; } catch(e){}
       if (script && script.parentNode) script.parentNode.removeChild(script);
     };
-    const timer = setTimeout(() => {
-      cleanup();
-      fetchLog[sheetName] = "TIMEOUT after 20s";
-      reject(new Error("Timeout"));
-    }, 20000);
-
+    const timer = setTimeout(() => { cleanup(); fetchLog[sheetName] = "TIMEOUT"; reject(new Error("Timeout")); }, 20000);
     window[cb] = function(data){
       clearTimeout(timer);
       try {
         if (!data || data.status !== "ok" || !data.table) {
-          fetchLog[sheetName] = "Bad response: " + (data && data.status);
-          cleanup();
-          reject(new Error("Invalid response"));
-          return;
+          fetchLog[sheetName] = "Bad response"; cleanup(); reject(new Error("Invalid response")); return;
         }
-
-        // Convert all cells to raw strings
         const rawRows = (data.table.rows || []).map(row =>
           (row.c || []).map(cell => {
             if(!cell) return "";
@@ -322,54 +314,80 @@ function fetchSheet(sheetName){
             return "";
           })
         );
-
-        // Check if gviz gave meaningful column labels
         const cols = (data.table.cols || []).map(c => String(c.label || "").trim());
         const haveLabels = cols.length > 0 && cols.some(l => l && /[a-z]/i.test(l));
-
         let headers, dataRows;
-        if (haveLabels) {
-          headers = cols;
-          dataRows = rawRows;
-        } else {
-          // First row is the header row
+        if (haveLabels) { headers = cols; dataRows = rawRows; }
+        else {
           const copy = rawRows.slice();
           headers = (copy.shift() || []).map(h => String(h).trim());
           dataRows = copy;
         }
-
         const rows = dataRows.map(r => {
           const obj = {};
           headers.forEach((h, i) => { if(h) obj[h] = r[i] || ""; });
           return obj;
         });
-
         fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + headers.length + " mode=" + (haveLabels ? "gviz" : "manual");
-        cleanup();
-        resolve(rows);
-      } catch(err){
-        cleanup();
-        fetchLog[sheetName] = "Parse error: " + err.message;
-        reject(err);
-      }
+        cleanup(); resolve(rows);
+      } catch(err){ cleanup(); fetchLog[sheetName] = "Parse error"; reject(err); }
     };
-
     const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
                 "/gviz/tq?sheet=" + encodeURIComponent(sheetName) +
                 "&tqx=out:json;responseHandler:" + cb;
-
     script = document.createElement("script");
     script.src = url;
-    script.onerror = () => {
-      clearTimeout(timer);
-      fetchLog[sheetName] = "Script load failed";
-      cleanup();
-      reject(new Error("Script load failed"));
-    };
+    script.onerror = () => { clearTimeout(timer); fetchLog[sheetName] = "Script load failed"; cleanup(); reject(new Error("Script load failed")); };
     document.head.appendChild(script);
   });
 }
 
+// ============================================================
+// WRITE VIA APPS SCRIPT (no-cors POST)
+// ============================================================
+async function postRows(sheetName, rows){
+  if(!rows || !rows.length) return false;
+  try {
+    await fetch(API_BASE, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ sheet: sheetName, rows: rows }),
+    });
+    return true; // no-cors: opaque response, assume delivered if no error thrown
+  } catch(e) {
+    return false;
+  }
+}
+
+// Generic sync: sends all entries in the local queue, keeps unsent ones
+async function syncPending(storageGet, storageSave, sheetName){
+  const pending = storageGet();
+  if(!pending.length) return {sent: 0, remaining: 0};
+  setStatus(`Syncing ${pending.length}…`);
+  const ok = await postRows(sheetName, pending);
+  if(ok){
+    storageSave([]);
+    setStatus(`Synced ${pending.length}`);
+    return {sent: pending.length, remaining: 0};
+  } else {
+    setStatus(`Sync failed (${pending.length} kept)`);
+    return {sent: 0, remaining: pending.length};
+  }
+}
+
+// Auto-sync on load + every 60s
+async function autoSyncAll(){
+  if(!navigator.onLine) return;
+  await syncPending(getShrinkPending, saveShrinkPending, SHEETS.shrink_log);
+  await syncPending(getCodingPending, saveCodingPending, SHEETS.coding_log);
+}
+function scheduleAutoSync(){
+  setTimeout(autoSyncAll, 3000);
+  setInterval(autoSyncAll, 60000);
+}
+
+// ============================================================
 function findKey(obj, ...keywords){
   if(!obj) return null;
   const keys = Object.keys(obj);
@@ -397,7 +415,6 @@ async function loadProducts(){
     .map(x => ({code:String(x[kCode]).trim(), name:String(x[kName]||"").trim()}));
   return state.products;
 }
-
 async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
   try{
@@ -425,7 +442,6 @@ async function loadRawMaterials(){
   }catch(e){ state.rawMaterials = []; }
   return state.rawMaterials;
 }
-
 async function loadBOM(){
   if(state.bom.length) return state.bom;
   try{
@@ -440,7 +456,6 @@ async function loadBOM(){
   }catch(e){ state.bom = []; }
   return state.bom;
 }
-
 async function loadMachines(){
   if(state.machines.length) return state.machines;
   try{
@@ -454,13 +469,12 @@ async function loadMachines(){
         .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
         .map(x => ({name:String(x[kName]||"").trim()}));
     }
-  }catch(e){ /* fallback below */ }
+  }catch(e){ }
   if(state.machines.length === 0){
     state.machines = ["Machine 1","Machine 2","Machine 3"].map(n=>({name:n}));
   }
   return state.machines;
 }
-
 async function loadOperators(){
   if(state.operators.length) return state.operators;
   try{
@@ -474,7 +488,7 @@ async function loadOperators(){
         .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
         .map(x => ({name:String(x[kName]||"").trim()}));
     }
-  }catch(e){ /* fallback */ }
+  }catch(e){ }
   return state.operators;
 }
 
@@ -499,10 +513,9 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    const log = fetchLog[SHEETS.products] || "(no log)";
     c.innerHTML=`<div class="err-banner">Products failed to load.
 
-${log}
+${fetchLog[SHEETS.products] || "(no log)"}
 
 Error: ${err.message}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
@@ -550,17 +563,11 @@ async function renderWeighingProductPicker(){
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
-
     c.innerHTML=`<div class="info-banner">
       ${productsWithBOM.size} of ${products.length} products have a BOM.
-      <div style="font-size:11px;opacity:0.8;margin-top:8px;font-family:monospace">
-        BOM: ${esc(fetchLog[SHEETS.bom] || "(none)")}<br>
-        Raw: ${esc(fetchLog[SHEETS.raw_materials] || "(none)")}
-      </div>
     </div>
     <input class="search" id="w-search" placeholder="Search product…"/>
     <div id="w-list"></div>`;
-
     const render=(q="")=>{
       const list=document.getElementById("w-list");
       const query=q.trim().toLowerCase();
@@ -633,9 +640,7 @@ async function showWeighingForProduct(productCode){
       <button class="action-btn green" onclick="printBOM('${esc(product.code)}')">🖨️ Print BOM</button>
     </div>`;
   if(materials.length === 0){
-    html += `<div class="empty"><b>BOM not yet added for this product.</b><br><br>
-      <span style="font-size:12px">BOM rows in memory: ${state.bom.length}<br>
-      Raw rows in memory: ${state.rawMaterials.length}</span></div>`;
+    html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
     c.innerHTML = html; return;
   }
   materials.forEach((m, idx)=>{
@@ -807,14 +812,38 @@ async function renderBatchEntry(opts){
       </div>
       <div id="swEntries"></div>
       <button class="action-btn" id="swAdd" style="width:100%;margin-bottom:12px">+ Add Another Entry</button>
-      <button class="action-btn green" id="swSave" style="width:100%;margin-bottom:16px">💾 Save All Entries</button>
+      <button class="action-btn green" id="swSave" style="width:100%;margin-bottom:16px">💾 Save & Send</button>
+      <div id="swSync"></div>
       <div id="swPending"></div>
     `;
     c.innerHTML = "";
     c.appendChild(root);
 
     const entriesBox = root.querySelector("#swEntries");
+    const syncBox = root.querySelector("#swSync");
     const pendingBox = root.querySelector("#swPending");
+
+    const renderSyncBanner = () => {
+      const pending = opts.storageGet();
+      if(pending.length === 0){
+        syncBox.innerHTML = `<div class="ok-banner">✅ No pending entries. All sent.</div>`;
+        return;
+      }
+      syncBox.innerHTML = `
+        <div class="info-banner">
+          ${pending.length} pending entr${pending.length===1?"y":"ies"} waiting to sync.
+          <div style="margin-top:10px">
+            <button class="action-btn orange" id="swSyncNow">🔄 Sync Now</button>
+          </div>
+        </div>
+      `;
+      const btn = syncBox.querySelector("#swSyncNow");
+      if(btn) btn.onclick = async () => {
+        const r = await syncPending(opts.storageGet, opts.storageSave, opts.sheetName);
+        renderSyncBanner();
+        renderPending();
+      };
+    };
 
     const renderEntries = () => {
       entriesBox.innerHTML = entries.map((e, i) => `
@@ -900,7 +929,7 @@ async function renderBatchEntry(opts){
       const pending = opts.storageGet();
       if(pending.length === 0){ pendingBox.innerHTML = ""; return; }
       pendingBox.innerHTML = `
-        <div class="info-banner">${pending.length} pending entr${pending.length===1?"y":"ies"} saved on this phone.</div>
+        <div style="color:var(--dim);font-size:12px;margin-top:16px;margin-bottom:8px">Pending entries on this phone:</div>
         ${pending.map((p, i) => `
           <div class="entry-card">
             <h4>#${i+1} · ${esc(p.date)} <button class="remove-btn" data-del="${i}">Delete</button></h4>
@@ -922,6 +951,7 @@ async function renderBatchEntry(opts){
           list.splice(i, 1);
           opts.storageSave(list);
           renderPending();
+          renderSyncBanner();
         };
       });
       const exp = pendingBox.querySelector("#swExport");
@@ -940,29 +970,49 @@ async function renderBatchEntry(opts){
       renderEntries();
     };
 
-    root.querySelector("#swSave").onclick = () => {
+    root.querySelector("#swSave").onclick = async () => {
       const d = root.querySelector("#swDate").value || date;
       const valid = entries.filter(e => e.product && e.batch && e.machine && e.operator && e.qty);
       if(valid.length === 0){
         alert("Fill in at least one complete entry.\n\nRequired: Product, Batch No, Machine, Operator, Quantity.");
         return;
       }
+
       const toSave = valid.map(e => ({
-        date: d, product: e.product, productCode: e.productCode,
-        batch: e.batch, machine: e.machine, operator: e.operator,
-        qty: e.qty, savedAt: new Date().toISOString(),
+        Date: d,
+        Product: e.product,
+        "Product Code": e.productCode,
+        "Batch No": e.batch,
+        Machine: e.machine,
+        Operator: e.operator,
+        Quantity: e.qty,
+        "Saved At": new Date().toISOString(),
       }));
+
+      // Optimistic add to pending
       const existing = opts.storageGet();
       opts.storageSave(existing.concat(toSave));
-      setStatus(`Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} locally`);
       entries = [{product:"",productCode:"",batch:"",machine:"",operator:"",qty:""}];
       renderEntries();
       renderPending();
-      alert(`✅ Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} on this phone.`);
+      renderSyncBanner();
+
+      // Try to send immediately
+      setStatus("Sending…");
+      const r = await syncPending(opts.storageGet, opts.storageSave, opts.sheetName);
+      renderSyncBanner();
+      renderPending();
+
+      if(r.sent > 0 && r.remaining === 0){
+        alert(`✅ ${r.sent} entr${r.sent===1?"y":"ies"} sent to Google Sheet.`);
+      } else if(r.remaining > 0){
+        alert(`⚠️ ${r.remaining} entr${r.remaining===1?"y":"ies"} kept on phone. Tap "Sync Now" to retry when online.`);
+      }
     };
 
     renderEntries();
     renderPending();
+    renderSyncBanner();
     setStatus(opts.moduleTitle + " ready");
   } catch(err){
     c.innerHTML = `<div class="err-banner">Failed to load: ${err.message}</div>
@@ -976,6 +1026,7 @@ async function renderBatchEntry(opts){
 async function renderShrinkwrap(){
   await renderBatchEntry({
     moduleTitle: "Shrinkwrap",
+    sheetName: SHEETS.shrink_log,
     storageGet: getShrinkPending,
     storageSave: saveShrinkPending,
     machineFallback: ["Machine 1","Machine 2","Machine 3"],
@@ -985,6 +1036,7 @@ async function renderShrinkwrap(){
 async function renderCoding(){
   await renderBatchEntry({
     moduleTitle: "Coding",
+    sheetName: SHEETS.coding_log,
     storageGet: getCodingPending,
     storageSave: saveCodingPending,
     machineFallback: ["Coder 1","Coder 2","Coder 3","Coder 4","Coder 5"],
