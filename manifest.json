@@ -1,7 +1,8 @@
 {
   "name": "AFRAB Operations",
   "short_name": "AFRAB Ops",
-  "start_url": "./",
+  "start_url": "./?v=1",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f172a",
