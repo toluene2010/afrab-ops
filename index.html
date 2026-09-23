@@ -40,6 +40,7 @@
   .action-btn{background:var(--accent);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;margin-right:8px;margin-bottom:8px}
   .action-btn.alt{background:#475569}
   .action-btn.green{background:var(--green)}
+  .action-btn.red{background:var(--red)}
 
   .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
   .loading{text-align:center;padding:40px 20px;color:var(--dim)}
@@ -71,12 +72,19 @@
 
   .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
   .err-banner{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
+  .ok-banner{background:#14532d;border:1px solid #22c55e;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#86efac}
 
   .field{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);margin-bottom:10px}
   .field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 
-  /* PRINT STYLES */
-  .print-only { display: none; }
+  .entry-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
+  .entry-card h4{margin:0 0 12px 0;color:var(--accent);font-size:14px;display:flex;justify-content:space-between;align-items:center}
+  .entry-row{margin-bottom:10px}
+  .entry-row label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
+  .entry-row input,.entry-row select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;color:var(--text)}
+  .picker-btn{width:100%;background:#1e3a5f;border:1px solid var(--accent);color:var(--text);border-radius:8px;padding:10px;font-size:14px;text-align:left;cursor:pointer}
+  .remove-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+
   @media print {
     body { background: white; color: black; }
     .screen, .status-bar, .back-btn { display: none !important; }
@@ -93,6 +101,7 @@
     .print-sign { display: flex; justify-content: space-between; margin-top: 40px; font-size: 13px; }
     .print-sign div { border-top: 1px solid #000; width: 40%; padding-top: 4px; }
   }
+  .print-only { display: none; }
 </style>
 </head>
 <body>
@@ -129,6 +138,9 @@ const SHEET_URLS = {
   products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
   raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
   bom:           "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=55512345&single=true&output=csv",
+  // OPTIONAL — publish these when ready. Leave as "" if not yet created.
+  machines:      "",
+  operators:     "",
 };
 
 const PROXIES = [
@@ -138,40 +150,6 @@ const PROXIES = [
   url => "https://everyorigin.jwvbremen.nl/api/get?url=" + encodeURIComponent(url),
 ];
 
-// ============================================================
-// COMPANY INFO — edit in Admin, saved on this phone
-// ============================================================
-const COMPANY_DEFAULT = {
-  name:    "AFRAB PHARMACEUTICALS LTD",
-  address: "123 Industrial Avenue, Lagos, Nigeria",
-  phone:   "+234 806 521 1837",
-  email:   "info@afrab.com",
-};
-function getCompany(){
-  try{ return JSON.parse(localStorage.getItem("afrab.company")) || COMPANY_DEFAULT; }
-  catch(e){ return COMPANY_DEFAULT; }
-}
-function saveCompany(c){ localStorage.setItem("afrab.company", JSON.stringify(c)); }
-
-// ============================================================
-// FINISHED MATERIALS — local only, saved on this phone
-// ============================================================
-function getFinishedKey(code, qc){
-  return "afrab.finished." + code + "|" + (qc||"");
-}
-function isLocallyFinished(code, qc){
-  return localStorage.getItem(getFinishedKey(code, qc)) === "1";
-}
-function markFinished(code, qc){
-  localStorage.setItem(getFinishedKey(code, qc), "1");
-}
-function unmarkFinished(code, qc){
-  localStorage.removeItem(getFinishedKey(code, qc));
-}
-
-// ============================================================
-// FETCH
-// ============================================================
 const fetchLog = {};
 async function fetchCSV(url){
   const log = [];
@@ -189,11 +167,42 @@ async function fetchCSV(url){
 }
 
 // ============================================================
+// COMPANY INFO
+// ============================================================
+const COMPANY_DEFAULT = {
+  name:    "AFRAB PHARMACEUTICALS LTD",
+  address: "123 Industrial Avenue, Lagos, Nigeria",
+  phone:   "+234 806 521 1837",
+  email:   "info@afrab.com",
+};
+function getCompany(){
+  try{ return JSON.parse(localStorage.getItem("afrab.company")) || COMPANY_DEFAULT; }
+  catch(e){ return COMPANY_DEFAULT; }
+}
+function saveCompany(c){ localStorage.setItem("afrab.company", JSON.stringify(c)); }
+
+// ============================================================
+// LOCAL FINISHED MATERIALS
+// ============================================================
+function getFinishedKey(code, qc){ return "afrab.finished." + code + "|" + (qc||""); }
+function isLocallyFinished(code, qc){ return localStorage.getItem(getFinishedKey(code, qc)) === "1"; }
+function markFinished(code, qc){ localStorage.setItem(getFinishedKey(code, qc), "1"); }
+function unmarkFinished(code, qc){ localStorage.removeItem(getFinishedKey(code, qc)); }
+
+// ============================================================
+// SHRINKWRAP PENDING QUEUE
+// ============================================================
+function getShrinkPending(){
+  try{ return JSON.parse(localStorage.getItem("afrab.shrink.pending")) || []; }catch(e){ return []; }
+}
+function saveShrinkPending(list){ localStorage.setItem("afrab.shrink.pending", JSON.stringify(list)); }
+
+// ============================================================
 // STATE
 // ============================================================
 const state = {
   role: localStorage.getItem("afrab.role")||null,
-  products: [], rawMaterials: [], bom: [],
+  products: [], rawMaterials: [], bom: [], machines: [], operators: [],
   currentProduct: null,
 };
 
@@ -284,6 +293,7 @@ function openModule(id){
   showScreen("screen-module");
   if(id==="admin") renderAdmin();
   else if(id==="weighing") renderWeighingProductPicker();
+  else if(id==="shrink") renderShrinkwrap();
   else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
@@ -377,6 +387,45 @@ async function loadBOM(){
   }catch(e){ state.bom = []; }
   return state.bom;
 }
+async function loadMachines(){
+  if(state.machines.length) return state.machines;
+  if(!SHEET_URLS.machines){
+    state.machines = ["Machine 1","Machine 2","Machine 3"]; // fallback
+    return state.machines;
+  }
+  try{
+    const txt=await fetchCSV(SHEET_URLS.machines);
+    const {headers, rows} = parseSimpleCSV(txt);
+    const cName = findCol(headers, "machine name","name","machine");
+    const cType = findCol(headers, "type");
+    const cActive = findCol(headers, "active");
+    state.machines = rows
+      .filter(x => x[cName]?.trim())
+      .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
+      .map(x => ({name:(x[cName]||"").trim(), type:cType?(x[cType]||"").trim():""}));
+  }catch(e){
+    state.machines = ["Machine 1","Machine 2","Machine 3"]; // fallback
+  }
+  return state.machines;
+}
+async function loadOperators(){
+  if(state.operators.length) return state.operators;
+  if(!SHEET_URLS.operators){
+    state.operators = [];
+    return state.operators;
+  }
+  try{
+    const txt=await fetchCSV(SHEET_URLS.operators);
+    const {headers, rows} = parseSimpleCSV(txt);
+    const cName = findCol(headers, "operator name","name","operator");
+    const cActive = findCol(headers, "active");
+    state.operators = rows
+      .filter(x => x[cName]?.trim())
+      .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
+      .map(x => ({name:(x[cName]||"").trim()}));
+  }catch(e){ state.operators = []; }
+  return state.operators;
+}
 
 // ============================================================
 // ADMIN PRODUCTS
@@ -414,9 +463,7 @@ function renderCompanySettings(){
   const c=document.getElementById("module-content");
   const co = getCompany();
   c.innerHTML = `
-    <p style="color:var(--dim);font-size:13px;margin-bottom:16px">
-      These details appear on printed BOM reports.
-    </p>
+    <p style="color:var(--dim);font-size:13px;margin-bottom:16px">These details appear on printed BOM reports.</p>
     <label class="field-label">Company Name</label>
     <input class="field" id="co-name" value="${esc(co.name)}"/>
     <label class="field-label">Address</label>
@@ -432,17 +479,16 @@ function renderCompanySettings(){
 }
 function saveCompanyInfo(){
   saveCompany({
-    name:    document.getElementById("co-name").value.trim(),
+    name: document.getElementById("co-name").value.trim(),
     address: document.getElementById("co-addr").value.trim(),
-    phone:   document.getElementById("co-phone").value.trim(),
-    email:   document.getElementById("co-email").value.trim(),
+    phone: document.getElementById("co-phone").value.trim(),
+    email: document.getElementById("co-email").value.trim(),
   });
-  setStatus("Company info saved");
-  goHome();
+  setStatus("Company info saved"); goHome();
 }
 
 // ============================================================
-// WEIGHING — product picker
+// WEIGHING
 // ============================================================
 async function renderWeighingProductPicker(){
   const c=document.getElementById("module-content");
@@ -483,20 +529,14 @@ async function renderWeighingProductPicker(){
   }
 }
 
-// ============================================================
-// WEIGHING — material view (with mark-finished + print)
-// ============================================================
 async function showWeighingForProduct(productCode){
   const c=document.getElementById("module-content");
   const product = state.products.find(p=>p.code===productCode);
   state.currentProduct = product;
   const bomItems = state.bom.filter(b=>b.product===productCode);
   const today = new Date();
-
-  // For each BOM material, gather all records
   const materials = bomItems.map(b=>{
     const all = state.rawMaterials.filter(r=>r.code===b.material);
-    // Mark finished: respect both sheet status AND local override
     const enriched = all.map(r=>({
       ...r,
       sheetFinished: (r.status||"").trim().toLowerCase() === "finished",
@@ -504,17 +544,11 @@ async function showWeighingForProduct(productCode){
     }));
     const active = enriched.filter(r => !r.sheetFinished && !r.localFinished);
     const finishedList = enriched.filter(r => r.sheetFinished || r.localFinished);
-    return {
-      materialCode: b.material,
-      active, finishedList,
-      total: all.length,
-    };
+    return { materialCode: b.material, active, finishedList, total: all.length };
   });
-
   function parseFlexibleDate(str, isExpiry){
     if(!str) return null;
-    str = String(str).trim();
-    if(!str) return null;
+    str = String(str).trim(); if(!str) return null;
     let m = str.match(/^(\d{4})[-\/](\d{1,2})([-\/](\d{1,2}))?$/);
     if(m){const y=+m[1],mo=+m[2]-1,d=m[4]?+m[4]:(isExpiry?new Date(y,mo+1,0).getDate():1);return new Date(y,mo,d);}
     m = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/);
@@ -534,7 +568,6 @@ async function showWeighingForProduct(productCode){
     if(days<90)return{cls:"warn",label:`${days}d left`,pill:"warn"};
     return{cls:"",label:`${days}d left`,pill:"ok"};
   }
-
   let html=`<button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
     <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
@@ -543,33 +576,25 @@ async function showWeighingForProduct(productCode){
     <div style="margin-bottom:14px">
       <button class="action-btn green" onclick="printBOM('${esc(product.code)}')">🖨️ Print BOM</button>
     </div>`;
-
   if(materials.length === 0){
     html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
     c.innerHTML = html; return;
   }
-
   materials.forEach((m, idx)=>{
     html += `<div style="margin-bottom:14px">
       <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
-
     if(m.active.length === 0 && m.finishedList.length === 0){
-      html += `<div class="material-card expired">
-        <div class="mat-code">${esc(m.materialCode)}</div>
-        <div class="mat-name">Not in Raw Materials sheet</div>
-      </div>`;
+      html += `<div class="material-card expired"><div class="mat-code">${esc(m.materialCode)}</div>
+        <div class="mat-name">Not in Raw Materials sheet</div></div>`;
     } else if(m.active.length === 0){
-      html += `<div class="material-card done">
-        <div class="mat-code">${esc(m.materialCode)}</div>
+      html += `<div class="material-card done"><div class="mat-code">${esc(m.materialCode)}</div>
         <div class="mat-name">✓ All batches finished (${m.finishedList.length})</div>
-        <button class="unmark-btn" onclick="showFinishedBatch('${esc(m.materialCode)}')">Show finished</button>
-      </div>`;
+        <button class="unmark-btn" onclick="showFinishedBatch('${esc(m.materialCode)}')">Show finished</button></div>`;
     } else {
       m.active.forEach(rec=>{
         const days=daysUntil(rec.exp);
         const st=statusFor(days);
-        const safeCode = esc(rec.code);
-        const safeQc   = esc(rec.qc||"");
+        const safeCode = esc(rec.code); const safeQc = esc(rec.qc||"");
         html += `<div class="material-card ${st.cls}">
           <div class="mat-row"><span class="mat-code">${safeCode}</span>
             <span class="alert-pill ${st.pill}">${st.label}</span></div>
@@ -588,10 +613,6 @@ async function showWeighingForProduct(productCode){
   });
   c.innerHTML = html;
 }
-
-// ============================================================
-// MARK AS FINISHED (local only for now)
-// ============================================================
 function confirmMarkFinished(code, qc, batch){
   const msg = `Mark this batch as finished?\n\nMaterial: ${code}\nQC No: ${qc||"—"}\nBatch: ${batch||"—"}\n\nIt will be hidden from this phone.`;
   if(confirm(msg)){
@@ -600,7 +621,6 @@ function confirmMarkFinished(code, qc, batch){
     if(state.currentProduct) showWeighingForProduct(state.currentProduct.code);
   }
 }
-
 function showFinishedBatch(code){
   const records = state.rawMaterials.filter(r=>r.code===code);
   if(records.length === 0){ alert("No records"); return; }
@@ -612,7 +632,7 @@ function showFinishedBatch(code){
       msg += `• QC ${r.qc||"—"} | Batch ${r.batch||"—"} | Exp ${r.exp||"—"}\n  [${sheetFin?"Sheet":"Local"} finished]\n\n`;
     }
   });
-  const restore = confirm(msg + "\nRestore ALL local-finished batches? (Sheet-finished ones cannot be restored from here.)");
+  const restore = confirm(msg + "\nRestore ALL local-finished batches?");
   if(restore){
     records.forEach(r=>{ if(isLocallyFinished(r.code, r.qc)) unmarkFinished(r.code, r.qc); });
     setStatus("Restored");
@@ -630,8 +650,6 @@ function printBOM(productCode){
   const today = new Date();
   const dateStr = today.toISOString().slice(0,10);
   const timeStr = today.toTimeString().slice(0,5);
-
-  // Gather active materials
   const rows = [];
   bomItems.forEach((b, idx)=>{
     const all = state.rawMaterials.filter(r=>r.code===b.material);
@@ -640,69 +658,289 @@ function printBOM(productCode){
       return s !== "finished" && s !== "expired" && !isLocallyFinished(r.code, r.qc);
     });
     if(active.length === 0){
-      rows.push({
-        n: idx+1, code: b.material, name: "(no active batch)", 
-        batch: "—", qc: "—", mfg: "—", exp: "—"
-      });
+      rows.push({n:idx+1, code:b.material, name:"(no active batch)", batch:"—", qc:"—", mfg:"—", exp:"—"});
     } else {
       active.forEach(r=>{
-        rows.push({
-          n: idx+1, code: r.code, name: r.name,
-          batch: r.batch||"—", qc: r.qc||"—", mfg: r.mfg||"—", exp: r.exp||"—",
-        });
+        rows.push({n:idx+1, code:r.code, name:r.name, batch:r.batch||"—", qc:r.qc||"—", mfg:r.mfg||"—", exp:r.exp||"—"});
       });
     }
   });
-
-  const tableRows = rows.map(r=>`
-    <tr>
-      <td>${r.n}</td>
-      <td>${esc(r.code)}</td>
-      <td>${esc(r.name)}</td>
-      <td>${esc(r.batch)}</td>
-      <td>${esc(r.qc)}</td>
-      <td>${esc(r.mfg)}</td>
-      <td>${esc(r.exp)}</td>
-    </tr>`).join("");
-
-  const area = document.getElementById("print-area");
-  area.innerHTML = `
+  const tableRows = rows.map(r=>`<tr><td>${r.n}</td><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.batch)}</td><td>${esc(r.qc)}</td><td>${esc(r.mfg)}</td><td>${esc(r.exp)}</td></tr>`).join("");
+  document.getElementById("print-area").innerHTML = `
     <div class="print-header">
       <h1>${esc(co.name)}</h1>
-      <div class="addr">
-        ${esc(co.address)}<br>
-        ${co.phone ? "Phone: " + esc(co.phone) : ""}${co.email ? " &nbsp;|&nbsp; Email: " + esc(co.email) : ""}
-      </div>
+      <div class="addr">${esc(co.address)}<br>${co.phone?"Phone: "+esc(co.phone):""}${co.email?" &nbsp;|&nbsp; Email: "+esc(co.email):""}</div>
     </div>
-
     <div class="print-title">Bill of Materials</div>
-
     <div class="print-meta">
       <div><b>Product:</b> ${esc(product.name)}</div>
       <div><b>Product Code:</b> ${esc(product.code)}</div>
       <div><b>Date Printed:</b> ${dateStr} ${timeStr}</div>
       <div><b>Total Materials:</b> ${rows.length}</div>
     </div>
-
     <table class="print-table">
-      <thead>
-        <tr>
-          <th>#</th><th>Code</th><th>Material Name</th>
-          <th>Batch No</th><th>QC No</th><th>MFG Date</th><th>Expiry Date</th>
-        </tr>
-      </thead>
+      <thead><tr><th>#</th><th>Code</th><th>Material Name</th><th>Batch No</th><th>QC No</th><th>MFG Date</th><th>Expiry Date</th></tr></thead>
       <tbody>${tableRows}</tbody>
     </table>
-
-    <div class="print-sign">
-      <div>Prepared by</div>
-      <div>Checked by</div>
-    </div>
-  `;
-
+    <div class="print-sign"><div>Prepared by</div><div>Checked by</div></div>`;
   setTimeout(()=>window.print(), 100);
 }
 
+// ============================================================
+// GENERIC PICKER (modal)
+// ============================================================
+function openPicker(title, items, allowCustom){
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+    const panel = document.createElement("div");
+    panel.style.cssText = "background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column";
+    panel.innerHTML = `
+      <h3 style="color:var(--accent);margin:0 0 12px 0;font-size:16px">${esc(title)}</h3>
+      <input class="search" id="pkSearch" placeholder="Search or type..."/>
+      <div id="pkList" style="flex:1;overflow:auto;min-height:100px;max-height:50vh"></div>
+      <button class="action-btn alt" id="pkCancel" style="margin-top:12px;width:100%">Cancel</button>
+    `;
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    const search = panel.querySelector("#pkSearch");
+    const list = panel.querySelector("#pkList");
+    const render = (q) => {
+      const raw = (q||"").trim();
+      const query = raw.toLowerCase();
+      const filtered = query ? items.filter(x => x.toLowerCase().includes(query)) : items;
+      let html = "";
+      if(filtered.length === 0){
+        html += `<div class="empty" style="padding:20px">No matches.</div>`;
+      } else {
+        html = filtered.map(x => `<div class="product-item" data-v="${esc(x)}">${esc(x)}</div>`).join("");
+      }
+      // Custom entry option
+      if(allowCustom && raw && !items.some(x=>x.toLowerCase()===query)){
+        html += `<div class="product-item" data-v="${esc(raw)}" style="border-color:var(--accent);color:var(--accent)">+ Use "${esc(raw)}"</div>`;
+      }
+      list.innerHTML = html;
+      list.querySelectorAll("[data-v]").forEach(el=>{
+        el.onclick = () => { cleanup(); resolve(el.getAttribute("data-v")); };
+      });
+    };
+    render("");
+    search.addEventListener("input", e => render(e.target.value));
+    panel.querySelector("#pkCancel").onclick = () => { cleanup(); resolve(null); };
+    function cleanup(){ overlay.remove(); }
+  });
+}
+
+// ============================================================
+// SHRINKWRAP MODULE
+// ============================================================
+async function renderShrinkwrap(){
+  const c = document.getElementById("module-content");
+  c.innerHTML = `<div class="loading">Loading products, machines, operators…</div>`;
+  try{
+    const [products, machines, operators] = await Promise.all([loadProducts(), loadMachines(), loadOperators()]);
+    if(products.length === 0){
+      c.innerHTML = `<div class="err-banner">Products failed to load.</div>
+        <button class="back-btn" onclick="goHome()">← Back</button>`;
+      return;
+    }
+    const machineNames = machines.map(m => m.name || m);
+    const operatorNames = operators.map(o => o.name || o);
+
+    // In-memory list of entries for this session
+    let entries = [{ product:"", productCode:"", batch:"", machine:"", operator:"", qty:"" }];
+    let date = new Date().toISOString().slice(0,10);
+
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <div class="entry-row">
+        <label>Date</label>
+        <input type="date" id="swDate" value="${date}"/>
+      </div>
+      <div id="swEntries"></div>
+      <button class="action-btn" id="swAdd" style="width:100%;margin-bottom:12px">+ Add Another Entry</button>
+      <button class="action-btn green" id="swSave" style="width:100%;margin-bottom:16px">💾 Save All Entries</button>
+      <div id="swPending"></div>
+    `;
+    c.innerHTML = "";
+    c.appendChild(root);
+
+    const entriesBox = root.querySelector("#swEntries");
+    const pendingBox = root.querySelector("#swPending");
+
+    const renderEntries = () => {
+      entriesBox.innerHTML = entries.map((e, i) => `
+        <div class="entry-card">
+          <h4>Entry ${i+1}
+            ${entries.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}
+          </h4>
+          <div class="entry-row">
+            <label>Product</label>
+            <button class="picker-btn" data-prod="${i}">
+              ${e.product ? esc(e.product) : "Tap to choose product"}
+            </button>
+          </div>
+          <div class="entry-row">
+            <label>Batch No</label>
+            <input data-batch="${i}" value="${esc(e.batch)}" placeholder="e.g. 26001"/>
+          </div>
+          <div class="entry-row">
+            <label>Machine</label>
+            <button class="picker-btn" data-mach="${i}">
+              ${e.machine ? esc(e.machine) : "Tap to choose machine"}
+            </button>
+          </div>
+          <div class="entry-row">
+            <label>Operator</label>
+            <button class="picker-btn" data-op="${i}">
+              ${e.operator ? esc(e.operator) : "Tap to choose operator"}
+            </button>
+          </div>
+          <div class="entry-row">
+            <label>Quantity Shrinkwrapped</label>
+            <input data-qty="${i}" type="number" inputmode="numeric" value="${esc(e.qty)}" placeholder="e.g. 500"/>
+          </div>
+        </div>
+      `).join("");
+      bindEntryHandlers();
+    };
+
+    const bindEntryHandlers = () => {
+      entriesBox.querySelectorAll("[data-prod]").forEach(btn => {
+        btn.onclick = async () => {
+          const i = +btn.getAttribute("data-prod");
+          const names = products.map(p => `${p.code} — ${p.name}`);
+          const picked = await openPicker("Choose Product", names, false);
+          if(picked){
+            const code = picked.split(" — ")[0];
+            const found = products.find(p => p.code === code);
+            if(found){
+              entries[i].product = found.name;
+              entries[i].productCode = found.code;
+              renderEntries();
+            }
+          }
+        };
+      });
+      entriesBox.querySelectorAll("[data-mach]").forEach(btn => {
+        btn.onclick = async () => {
+          const i = +btn.getAttribute("data-mach");
+          const picked = await openPicker("Choose Machine", machineNames, true);
+          if(picked){ entries[i].machine = picked; renderEntries(); }
+        };
+      });
+      entriesBox.querySelectorAll("[data-op]").forEach(btn => {
+        btn.onclick = async () => {
+          const i = +btn.getAttribute("data-op");
+          const picked = await openPicker("Choose Operator", operatorNames, true);
+          if(picked){ entries[i].operator = picked; renderEntries(); }
+        };
+      });
+      entriesBox.querySelectorAll("[data-rm]").forEach(btn => {
+        btn.onclick = () => {
+          const i = +btn.getAttribute("data-rm");
+          entries.splice(i, 1);
+          if(entries.length === 0) entries.push({product:"",productCode:"",batch:"",machine:"",operator:"",qty:""});
+          renderEntries();
+        };
+      });
+      // Live text inputs
+      entriesBox.querySelectorAll("[data-batch]").forEach(inp => {
+        inp.oninput = e => { entries[+e.target.getAttribute("data-batch")].batch = e.target.value; };
+      });
+      entriesBox.querySelectorAll("[data-qty]").forEach(inp => {
+        inp.oninput = e => { entries[+e.target.getAttribute("data-qty")].qty = e.target.value; };
+      });
+    };
+
+    const renderPending = () => {
+      const pending = getShrinkPending();
+      if(pending.length === 0){
+        pendingBox.innerHTML = "";
+        return;
+      }
+      pendingBox.innerHTML = `
+        <div class="info-banner">${pending.length} pending entr${pending.length===1?"y":"ies"} saved on this phone.</div>
+        ${pending.map((p, i) => `
+          <div class="entry-card">
+            <h4>#${i+1} · ${esc(p.date)} <button class="remove-btn" data-del="${i}">Delete</button></h4>
+            <div style="font-size:13px;line-height:1.6">
+              <div><b>Product:</b> ${esc(p.product)}</div>
+              <div><b>Batch:</b> ${esc(p.batch)}</div>
+              <div><b>Machine:</b> ${esc(p.machine)}</div>
+              <div><b>Operator:</b> ${esc(p.operator)}</div>
+              <div><b>Qty:</b> ${esc(p.qty)}</div>
+            </div>
+          </div>
+        `).join("")}
+        <button class="action-btn alt" id="swExport">📤 Export as Text</button>
+      `;
+      pendingBox.querySelectorAll("[data-del]").forEach(btn => {
+        btn.onclick = () => {
+          const i = +btn.getAttribute("data-del");
+          const list = getShrinkPending();
+          list.splice(i, 1);
+          saveShrinkPending(list);
+          renderPending();
+        };
+      });
+      const exp = pendingBox.querySelector("#swExport");
+      if(exp) exp.onclick = () => {
+        const list = getShrinkPending();
+        const txt = list.map(p => `${p.date}\t${p.productCode||p.product}\t${p.batch}\t${p.machine}\t${p.operator}\t${p.qty}`).join("\n");
+        navigator.clipboard.writeText(txt).then(()=>{
+          setStatus("Copied to clipboard");
+          alert("Copied " + list.length + " entries to clipboard.\n\nYou can paste into WhatsApp, email, or a sheet.");
+        }).catch(()=>{
+          alert("Entries:\n\n" + txt);
+        });
+      };
+    };
+
+    root.querySelector("#swAdd").onclick = () => {
+      entries.push({product:"",productCode:"",batch:"",machine:"",operator:"",qty:""});
+      renderEntries();
+    };
+
+    root.querySelector("#swSave").onclick = () => {
+      const d = root.querySelector("#swDate").value || date;
+      // Validate
+      const valid = entries.filter(e => e.product && e.batch && e.machine && e.operator && e.qty);
+      if(valid.length === 0){
+        alert("Fill in at least one complete entry.\n\nRequired: Product, Batch No, Machine, Operator, Quantity.");
+        return;
+      }
+      const toSave = valid.map(e => ({
+        date: d,
+        product: e.product,
+        productCode: e.productCode,
+        batch: e.batch,
+        machine: e.machine,
+        operator: e.operator,
+        qty: e.qty,
+        savedAt: new Date().toISOString(),
+      }));
+      const existing = getShrinkPending();
+      saveShrinkPending(existing.concat(toSave));
+      setStatus(`Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} locally`);
+      entries = [{product:"",productCode:"",batch:"",machine:"",operator:"",qty:""}];
+      renderEntries();
+      renderPending();
+      alert(`✅ Saved ${toSave.length} entr${toSave.length===1?"y":"ies"} on this phone.\n\nThey will appear in the Pending section below. When the Google Sheet endpoint is ready, these will be pushed automatically.`);
+    };
+
+    renderEntries();
+    renderPending();
+    setStatus("Shrinkwrap ready");
+  } catch(err){
+    c.innerHTML = `<div class="err-banner">Failed to load: ${err.message}</div>
+      <button class="back-btn" onclick="goHome()">← Back</button>`;
+  }
+}
+
+// ============================================================
+// UTIL
+// ============================================================
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 if("serviceWorker" in navigator){
