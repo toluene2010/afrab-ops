@@ -132,38 +132,9 @@
 
 <script>
 // ============================================================
-// CONFIG
+// APPS SCRIPT WEB APP URL
 // ============================================================
-const SHEET_URLS = {
-  products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
-  raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
-  bom:           "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=55512345&single=true&output=csv",
-  machines:      "",
-  operators:     "",
-};
-
-const PROXIES = [
-  url => url,
-  url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
-  url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
-  url => "https://everyorigin.jwvbremen.nl/api/get?url=" + encodeURIComponent(url),
-];
-
-const fetchLog = {};
-async function fetchCSV(url){
-  const log = [];
-  for(let i=0;i<PROXIES.length;i++){
-    try{
-      const finalUrl = PROXIES[i](url);
-      const r = await fetch(finalUrl, {cache:"no-store"});
-      const txt = await r.text();
-      log.push(`proxy[${i}] status=${r.status} len=${txt.length}`);
-      if(r.ok && txt && txt.length > 5) { fetchLog[url] = log.join("\n"); return txt; }
-    }catch(e){ log.push(`proxy[${i}] ERROR ${e.message}`); }
-  }
-  fetchLog[url] = log.join("\n");
-  throw new Error("Failed to fetch");
-}
+const API_BASE = "https://script.google.com/macros/s/AKfycbwKkCOGWDXDDtD_bpUeqS99S4ytOYUpcq8n4gOPImZu4e45WCuGOH2ZNv0gIgwJE0NjDw/exec";
 
 // ============================================================
 // COMPANY INFO
@@ -303,35 +274,32 @@ function openModule(id){
 }
 
 // ============================================================
-// CSV PARSER
+// DATA FETCH (via Apps Script)
 // ============================================================
-function parseCSV(t){
-  const rows=[];let cur=[],f="",inq=false;
-  for(let i=0;i<t.length;i++){const c=t[i];
-    if(inq){if(c==='"'&&t[i+1]==='"'){f+='"';i++;}else if(c==='"')inq=false;else f+=c;}
-    else{if(c==='"')inq=true;else if(c===","){cur.push(f);f="";}
-      else if(c==="\n"){cur.push(f);rows.push(cur);cur=[];f="";}
-      else if(c!=="\r")f+=c;}}
-  if(f||cur.length){cur.push(f);rows.push(cur);}
-  if(!rows.length)return{headers:[],rows:[]};
-  const headers=rows[0].map(x=>x.trim());
-  return {headers, rows: rows.slice(1)};
-}
-function parseSimpleCSV(t){
-  const {headers, rows} = parseCSV(t);
-  const out=[];
-  for(const r of rows){
-    if(!r.length || !r[0]?.trim()) continue;
-    const obj = {};
-    headers.forEach((hh,i)=>{ obj[hh]=r[i]; });
-    out.push(obj);
+const fetchLog = {};
+
+async function fetchSheet(sheetName){
+  const url = API_BASE + "?sheet=" + encodeURIComponent(sheetName);
+  try{
+    const r = await fetch(url, {cache:"no-store"});
+    const txt = await r.text();
+    fetchLog[sheetName] = `status=${r.status} len=${txt.length}`;
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const data = JSON.parse(txt);
+    if(data.error) throw new Error(data.error);
+    return data;
+  }catch(e){
+    fetchLog[sheetName] = "ERROR: " + e.message;
+    throw e;
   }
-  return {headers, rows: out};
 }
-function findCol(headers, ...keywords){
+
+function findKey(obj, ...keywords){
+  if(!obj) return null;
+  const keys = Object.keys(obj);
   for(const k of keywords){
-    const idx = headers.findIndex(h=>h.toLowerCase().includes(k.toLowerCase()));
-    if(idx >= 0) return headers[idx];
+    const found = keys.find(kk => kk.toLowerCase().includes(k.toLowerCase()));
+    if(found) return found;
   }
   return null;
 }
@@ -341,90 +309,93 @@ function findCol(headers, ...keywords){
 // ============================================================
 async function loadProducts(){
   if(state.products.length) return state.products;
-  const url=SHEET_URLS.products;
-  const txt=await fetchCSV(url);
-  const {headers, rows} = parseSimpleCSV(txt);
-  const cCode = findCol(headers, "product code","code");
-  const cName = findCol(headers, "product name","name");
-  const cActive = findCol(headers, "active");
+  const rows = await fetchSheet("Products");
+  if(!rows.length) return [];
+  const sample = rows[0];
+  const kCode = findKey(sample, "product code", "code");
+  const kName = findKey(sample, "product name", "name");
+  const kActive = findKey(sample, "active");
   state.products = rows
-    .filter(x => x[cCode]?.trim())
-    .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
-    .map(x => ({code:x[cCode].trim(), name:(x[cName]||"").trim()}));
+    .filter(x => x[kCode] && String(x[kCode]).trim())
+    .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
+    .map(x => ({code:String(x[kCode]).trim(), name:String(x[kName]||"").trim()}));
   return state.products;
 }
+
 async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
-  try{
-    const url=SHEET_URLS.raw_materials;
-    const txt=await fetchCSV(url);
-    const {headers, rows} = parseSimpleCSV(txt);
-    const cCode = findCol(headers, "material code");
-    const cName = findCol(headers, "material name");
-    const cBatch= findCol(headers, "batch no","batch","lot");
-    const cQC   = findCol(headers, "qc");
-    const cMFG  = findCol(headers, "mfg","manufactur");
-    const cEXP  = findCol(headers, "expir","exp");
-    const cStat = findCol(headers, "status");
-    state.rawMaterials = rows
-      .filter(x => x[cCode]?.trim())
-      .map(x => ({
-        code: (x[cCode]||"").trim(), name: (x[cName]||"").trim(),
-        batch:cBatch?(x[cBatch]||"").trim():"",
-        qc:(x[cQC]||"").trim(), mfg:(x[cMFG]||"").trim(),
-        exp:(x[cEXP]||"").trim(),
-        status:cStat?(x[cStat]||"").trim():"Active",
-      }));
-  }catch(e){ state.rawMaterials = []; }
+  const rows = await fetchSheet("Raw_Materials");
+  if(!rows.length) return [];
+  const sample = rows[0];
+  const kCode  = findKey(sample, "material code");
+  const kName  = findKey(sample, "material name");
+  const kBatch = findKey(sample, "batch no","batch","lot");
+  const kQC    = findKey(sample, "qc");
+  const kMFG   = findKey(sample, "mfg","manufactur");
+  const kEXP   = findKey(sample, "expir","exp");
+  const kStat  = findKey(sample, "status");
+  state.rawMaterials = rows
+    .filter(x => x[kCode] && String(x[kCode]).trim())
+    .map(x => ({
+      code:  String(x[kCode]||"").trim(),
+      name:  String(x[kName]||"").trim(),
+      batch: kBatch ? String(x[kBatch]||"").trim() : "",
+      qc:    String(x[kQC]||"").trim(),
+      mfg:   String(x[kMFG]||"").trim(),
+      exp:   String(x[kEXP]||"").trim(),
+      status: kStat ? String(x[kStat]||"").trim() : "Active",
+    }));
   return state.rawMaterials;
 }
+
 async function loadBOM(){
   if(state.bom.length) return state.bom;
-  try{
-    const url=SHEET_URLS.bom;
-    const txt=await fetchCSV(url);
-    const {headers, rows} = parseSimpleCSV(txt);
-    const cProd = findCol(headers, "product code","product");
-    const cMat  = findCol(headers, "material code","material");
-    state.bom = rows
-      .filter(x => x[cProd]?.trim() && x[cMat]?.trim())
-      .map(x => ({product:(x[cProd]||"").trim(), material:(x[cMat]||"").trim()}));
-  }catch(e){ state.bom = []; }
+  const rows = await fetchSheet("BOM");
+  if(!rows.length) return [];
+  const sample = rows[0];
+  const kProd = findKey(sample, "product code");
+  const kMat  = findKey(sample, "material code");
+  state.bom = rows
+    .filter(x => x[kProd] && x[kMat])
+    .map(x => ({product:String(x[kProd]).trim(), material:String(x[kMat]).trim()}));
   return state.bom;
 }
+
 async function loadMachines(){
   if(state.machines.length) return state.machines;
-  if(!SHEET_URLS.machines){
-    state.machines = ["Machine 1","Machine 2","Machine 3"];
-    return state.machines;
-  }
   try{
-    const txt=await fetchCSV(SHEET_URLS.machines);
-    const {headers, rows} = parseSimpleCSV(txt);
-    const cName = findCol(headers, "machine name","name","machine");
-    const cActive = findCol(headers, "active");
-    state.machines = rows
-      .filter(x => x[cName]?.trim())
-      .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
-      .map(x => ({name:(x[cName]||"").trim()}));
-  }catch(e){
-    state.machines = ["Machine 1","Machine 2","Machine 3"];
+    const rows = await fetchSheet("Machines");
+    if(rows.length){
+      const sample = rows[0];
+      const kName = findKey(sample, "machine name","name","machine");
+      const kType = findKey(sample, "type");
+      const kActive = findKey(sample, "active");
+      state.machines = rows
+        .filter(x => x[kName] && String(x[kName]).trim())
+        .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
+        .map(x => ({name:String(x[kName]||"").trim(), type:kType?String(x[kType]||"").trim():""}));
+    }
+  }catch(e){ /* fall back below */ }
+  if(state.machines.length === 0){
+    state.machines = ["Machine 1","Machine 2","Machine 3"].map(n=>({name:n, type:""}));
   }
   return state.machines;
 }
+
 async function loadOperators(){
   if(state.operators.length) return state.operators;
-  if(!SHEET_URLS.operators){ state.operators = []; return state.operators; }
   try{
-    const txt=await fetchCSV(SHEET_URLS.operators);
-    const {headers, rows} = parseSimpleCSV(txt);
-    const cName = findCol(headers, "operator name","name","operator");
-    const cActive = findCol(headers, "active");
-    state.operators = rows
-      .filter(x => x[cName]?.trim())
-      .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
-      .map(x => ({name:(x[cName]||"").trim()}));
-  }catch(e){ state.operators = []; }
+    const rows = await fetchSheet("Operators");
+    if(rows.length){
+      const sample = rows[0];
+      const kName = findKey(sample, "operator name","name","operator");
+      const kActive = findKey(sample, "active");
+      state.operators = rows
+        .filter(x => x[kName] && String(x[kName]).trim())
+        .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
+        .map(x => ({name:String(x[kName]||"").trim()}));
+    }
+  }catch(e){ /* fall back to empty */ }
   return state.operators;
 }
 
@@ -437,7 +408,6 @@ async function renderAdmin(){
   try{
     const p=await loadProducts();
     setStatus(`${p.length} products loaded`);
-    if(p.length === 0) throw new Error("0 products returned");
     c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/>
       <div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products</div>
       <div id="prod-list"></div>`;
@@ -450,8 +420,12 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    const log = fetchLog[SHEET_URLS.products] || "(no log)";
-    c.innerHTML=`<div class="err-banner">Products failed to load.\n\n${log}\n\nError: ${err.message}</div>
+    const log = fetchLog["Products"] || "(no log)";
+    c.innerHTML=`<div class="err-banner">Products failed to load.
+
+${log}
+
+Error: ${err.message}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
@@ -497,11 +471,6 @@ async function renderWeighingProductPicker(){
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
-    if(products.length === 0){
-      c.innerHTML=`<div class="err-banner">Products failed to load.</div>
-        <button class="back-btn" onclick="goHome()">← Back</button>`;
-      return;
-    }
     c.innerHTML=`<div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
       <input class="search" id="w-search" placeholder="Search product…"/>
       <div id="w-list"></div>`;
@@ -728,10 +697,9 @@ function openPicker(title, items, allowCustom){
 }
 
 // ============================================================
-// REUSABLE BATCH ENTRY FORM (for Shrinkwrap & Coding)
+// REUSABLE BATCH ENTRY FORM
 // ============================================================
 async function renderBatchEntry(opts){
-  // opts: { moduleTitle, storageGet, storageSave, pendingLabel, machineFallback, qtyLabel }
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading products, machines, operators…</div>`;
   try{
@@ -919,7 +887,7 @@ async function renderBatchEntry(opts){
 }
 
 // ============================================================
-// SHRINKWRAP MODULE
+// SHRINKWRAP
 // ============================================================
 async function renderShrinkwrap(){
   await renderBatchEntry({
@@ -932,7 +900,7 @@ async function renderShrinkwrap(){
 }
 
 // ============================================================
-// CODING MODULE
+// CODING
 // ============================================================
 async function renderCoding(){
   await renderBatchEntry({
