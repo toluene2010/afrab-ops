@@ -280,18 +280,31 @@ const fetchLog = {};
 
 async function fetchSheet(sheetName){
   const url = API_BASE + "?sheet=" + encodeURIComponent(sheetName);
-  try{
-    const r = await fetch(url, {cache:"no-store"});
-    const txt = await r.text();
-    fetchLog[sheetName] = `status=${r.status} len=${txt.length}`;
-    if(!r.ok) throw new Error("HTTP " + r.status);
-    const data = JSON.parse(txt);
-    if(data.error) throw new Error(data.error);
-    return data;
-  }catch(e){
-    fetchLog[sheetName] = "ERROR: " + e.message;
-    throw e;
+  const proxies = [
+    u => u,
+    u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u),
+    u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+    u => "https://everyorigin.jwvbremen.nl/api/get?url=" + encodeURIComponent(u),
+  ];
+  const log = [];
+  for(let i=0;i<proxies.length;i++){
+    try{
+      const finalUrl = proxies[i](url);
+      const r = await fetch(finalUrl, {cache:"no-store"});
+      const txt = await r.text();
+      log.push(`[${i}] status=${r.status} len=${txt.length}`);
+      if(r.ok && txt && txt.length > 5){
+        const data = JSON.parse(txt);
+        if(data.error) throw new Error(data.error);
+        fetchLog[sheetName] = log.join(" | ");
+        return data;
+      }
+    }catch(e){
+      log.push(`[${i}] ERR ${e.message.slice(0,40)}`);
+    }
   }
+  fetchLog[sheetName] = log.join(" | ");
+  throw new Error("All fetch attempts failed");
 }
 
 function findKey(obj, ...keywords){
@@ -420,7 +433,7 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    const log = fetchLog["Products"] || "(no log)";
+    const log = fetchLog["Drug database"] || fetchLog["Products"] || "(no log)";
     c.innerHTML=`<div class="err-banner">Products failed to load.
 
 ${log}
