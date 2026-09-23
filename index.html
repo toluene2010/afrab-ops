@@ -101,13 +101,12 @@ const SHEET_URLS = {
 };
 
 // ============================================================
-// CORS PROXY — fixes "Failed to fetch" on mobile browsers
-// Primary: allorigins.win, fallback: corsproxy.io
+// CORS fallback — direct first, then proxies only if needed
 // ============================================================
 const PROXIES = [
+  url => url, // DIRECT FIRST — this is what works for Products
   url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
   url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
-  url => url, // direct (last resort)
 ];
 
 async function fetchCSV(url){
@@ -122,10 +121,9 @@ async function fetchCSV(url){
       throw new Error("Empty response");
     }catch(e){
       lastErr = e;
-      // try next proxy
     }
   }
-  throw new Error("All proxies failed: " + (lastErr ? lastErr.message : "unknown"));
+  throw new Error("Fetch failed: " + (lastErr ? lastErr.message : "unknown"));
 }
 
 // ============================================================
