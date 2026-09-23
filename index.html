@@ -72,7 +72,6 @@
 
   .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
   .err-banner{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
-  .ok-banner{background:#14532d;border:1px solid #22c55e;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#86efac}
 
   .field{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);margin-bottom:10px}
   .field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
@@ -135,6 +134,15 @@
 // APPS SCRIPT WEB APP URL
 // ============================================================
 const API_BASE = "https://script.google.com/macros/s/AKfycbwKkCOGWDXDDtD_bpUeqS99S4ytOYUpcq8n4gOPImZu4e45WCuGOH2ZNv0gIgwJE0NjDw/exec";
+
+// Sheet name map — matches your real tab names
+const SHEETS = {
+  products:      "Drug database",
+  raw_materials: "Raw_Materials",
+  bom:           "BOM",
+  machines:      "Machines",
+  operators:     "Operators",
+};
 
 // ============================================================
 // COMPANY INFO
@@ -274,7 +282,7 @@ function openModule(id){
 }
 
 // ============================================================
-// DATA FETCH (via Apps Script)
+// FETCH VIA CORS PROXY (fixes Apps Script redirect block)
 // ============================================================
 const fetchLog = {};
 
@@ -292,15 +300,18 @@ async function fetchSheet(sheetName){
       const finalUrl = proxies[i](url);
       const r = await fetch(finalUrl, {cache:"no-store"});
       const txt = await r.text();
-      log.push(`[${i}] status=${r.status} len=${txt.length}`);
+      log.push(`[${i}] ${r.status} len=${txt.length}`);
       if(r.ok && txt && txt.length > 5){
         const data = JSON.parse(txt);
-        if(data.error) throw new Error(data.error);
+        if(data.error){
+          fetchLog[sheetName] = log.join(" | ") + ` | SERVER: ${data.error}`;
+          return data;
+        }
         fetchLog[sheetName] = log.join(" | ");
         return data;
       }
     }catch(e){
-      log.push(`[${i}] ERR ${e.message.slice(0,40)}`);
+      log.push(`[${i}] ERR ${String(e.message).slice(0,30)}`);
     }
   }
   fetchLog[sheetName] = log.join(" | ");
@@ -322,8 +333,8 @@ function findKey(obj, ...keywords){
 // ============================================================
 async function loadProducts(){
   if(state.products.length) return state.products;
-  const rows = await fetchSheet("Drug database");
-  if(!rows.length) return [];
+  const rows = await fetchSheet(SHEETS.products);
+  if(!Array.isArray(rows) || !rows.length) return [];
   const sample = rows[0];
   const kCode = findKey(sample, "product code", "code");
   const kName = findKey(sample, "product name", "name");
@@ -337,60 +348,63 @@ async function loadProducts(){
 
 async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
-  const rows = await fetchSheet("Raw_Materials");
-  if(!rows.length) return [];
-  const sample = rows[0];
-  const kCode  = findKey(sample, "material code");
-  const kName  = findKey(sample, "material name");
-  const kBatch = findKey(sample, "batch no","batch","lot");
-  const kQC    = findKey(sample, "qc");
-  const kMFG   = findKey(sample, "mfg","manufactur");
-  const kEXP   = findKey(sample, "expir","exp");
-  const kStat  = findKey(sample, "status");
-  state.rawMaterials = rows
-    .filter(x => x[kCode] && String(x[kCode]).trim())
-    .map(x => ({
-      code:  String(x[kCode]||"").trim(),
-      name:  String(x[kName]||"").trim(),
-      batch: kBatch ? String(x[kBatch]||"").trim() : "",
-      qc:    String(x[kQC]||"").trim(),
-      mfg:   String(x[kMFG]||"").trim(),
-      exp:   String(x[kEXP]||"").trim(),
-      status: kStat ? String(x[kStat]||"").trim() : "Active",
-    }));
+  try{
+    const rows = await fetchSheet(SHEETS.raw_materials);
+    if(!Array.isArray(rows) || !rows.length) return [];
+    const sample = rows[0];
+    const kCode  = findKey(sample, "material code");
+    const kName  = findKey(sample, "material name");
+    const kBatch = findKey(sample, "batch no","batch","lot");
+    const kQC    = findKey(sample, "qc");
+    const kMFG   = findKey(sample, "mfg","manufactur");
+    const kEXP   = findKey(sample, "expir","exp");
+    const kStat  = findKey(sample, "status");
+    state.rawMaterials = rows
+      .filter(x => x[kCode] && String(x[kCode]).trim())
+      .map(x => ({
+        code:  String(x[kCode]||"").trim(),
+        name:  String(x[kName]||"").trim(),
+        batch: kBatch ? String(x[kBatch]||"").trim() : "",
+        qc:    String(x[kQC]||"").trim(),
+        mfg:   String(x[kMFG]||"").trim(),
+        exp:   String(x[kEXP]||"").trim(),
+        status: kStat ? String(x[kStat]||"").trim() : "Active",
+      }));
+  }catch(e){ state.rawMaterials = []; }
   return state.rawMaterials;
 }
 
 async function loadBOM(){
   if(state.bom.length) return state.bom;
-  const rows = await fetchSheet("BOM");
-  if(!rows.length) return [];
-  const sample = rows[0];
-  const kProd = findKey(sample, "product code");
-  const kMat  = findKey(sample, "material code");
-  state.bom = rows
-    .filter(x => x[kProd] && x[kMat])
-    .map(x => ({product:String(x[kProd]).trim(), material:String(x[kMat]).trim()}));
+  try{
+    const rows = await fetchSheet(SHEETS.bom);
+    if(!Array.isArray(rows) || !rows.length) return [];
+    const sample = rows[0];
+    const kProd = findKey(sample, "product code");
+    const kMat  = findKey(sample, "material code");
+    state.bom = rows
+      .filter(x => x[kProd] && x[kMat])
+      .map(x => ({product:String(x[kProd]).trim(), material:String(x[kMat]).trim()}));
+  }catch(e){ state.bom = []; }
   return state.bom;
 }
 
 async function loadMachines(){
   if(state.machines.length) return state.machines;
   try{
-    const rows = await fetchSheet("Machines");
-    if(rows.length){
+    const rows = await fetchSheet(SHEETS.machines);
+    if(Array.isArray(rows) && rows.length){
       const sample = rows[0];
       const kName = findKey(sample, "machine name","name","machine");
-      const kType = findKey(sample, "type");
       const kActive = findKey(sample, "active");
       state.machines = rows
         .filter(x => x[kName] && String(x[kName]).trim())
         .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
-        .map(x => ({name:String(x[kName]||"").trim(), type:kType?String(x[kType]||"").trim():""}));
+        .map(x => ({name:String(x[kName]||"").trim()}));
     }
-  }catch(e){ /* fall back below */ }
+  }catch(e){ /* fallback below */ }
   if(state.machines.length === 0){
-    state.machines = ["Machine 1","Machine 2","Machine 3"].map(n=>({name:n, type:""}));
+    state.machines = ["Machine 1","Machine 2","Machine 3"].map(n=>({name:n}));
   }
   return state.machines;
 }
@@ -398,8 +412,8 @@ async function loadMachines(){
 async function loadOperators(){
   if(state.operators.length) return state.operators;
   try{
-    const rows = await fetchSheet("Operators");
-    if(rows.length){
+    const rows = await fetchSheet(SHEETS.operators);
+    if(Array.isArray(rows) && rows.length){
       const sample = rows[0];
       const kName = findKey(sample, "operator name","name","operator");
       const kActive = findKey(sample, "active");
@@ -408,7 +422,7 @@ async function loadOperators(){
         .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
         .map(x => ({name:String(x[kName]||"").trim()}));
     }
-  }catch(e){ /* fall back to empty */ }
+  }catch(e){ /* fallback */ }
   return state.operators;
 }
 
@@ -433,7 +447,7 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    const log = fetchLog["Drug database"] || fetchLog["Products"] || "(no log)";
+    const log = fetchLog[SHEETS.products] || "(no log)";
     c.innerHTML=`<div class="err-banner">Products failed to load.
 
 ${log}
@@ -710,18 +724,13 @@ function openPicker(title, items, allowCustom){
 }
 
 // ============================================================
-// REUSABLE BATCH ENTRY FORM
+// BATCH ENTRY FORM (Shrinkwrap & Coding)
 // ============================================================
 async function renderBatchEntry(opts){
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading products, machines, operators…</div>`;
   try{
     const [products, machines, operators] = await Promise.all([loadProducts(), loadMachines(), loadOperators()]);
-    if(products.length === 0){
-      c.innerHTML = `<div class="err-banner">Products failed to load.</div>
-        <button class="back-btn" onclick="goHome()">← Back</button>`;
-      return;
-    }
     const machineNames = (machines.length ? machines : [{name:opts.machineFallback}]).map(m => m.name || m);
     const operatorNames = operators.map(o => o.name || o);
 
@@ -900,7 +909,7 @@ async function renderBatchEntry(opts){
 }
 
 // ============================================================
-// SHRINKWRAP
+// SHRINKWRAP & CODING
 // ============================================================
 async function renderShrinkwrap(){
   await renderBatchEntry({
@@ -911,10 +920,6 @@ async function renderShrinkwrap(){
     qtyLabel: "Quantity Shrinkwrapped",
   });
 }
-
-// ============================================================
-// CODING
-// ============================================================
 async function renderCoding(){
   await renderBatchEntry({
     moduleTitle: "Coding",
