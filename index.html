@@ -131,15 +131,16 @@
 
 <script>
 // ============================================================
-// SPREADSHEET + TABS
+// SPREADSHEET + TAB NAMES (case-sensitive)
 // ============================================================
 const SPREADSHEET_ID = "1mwo5IXXrIu4bnqR8GOV1qNxQ31rdfdUjeLfBQf22t1M";
+
 const SHEETS = {
   products:      "Drug database",
-  raw_materials: "raw_materials",
+  raw_materials: "Raw_Materials",
   bom:           "bom",
-  machines:      "machines",
-  operators:     "operators",
+  machines:      "Machines",
+  operators:     "Operators",
 };
 
 // ============================================================
@@ -279,8 +280,7 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA JSONP — bypasses CORS completely
-// Uses gviz/tq loaded as <script> with a callback
+// FETCH VIA JSONP (gviz/tq) — bypasses CORS
 // ============================================================
 const fetchLog = {};
 
@@ -288,6 +288,7 @@ function fetchSheet(sheetName){
   return new Promise((resolve, reject) => {
     const cb = "gviz_cb_" + Math.random().toString(36).slice(2);
     let done = false;
+    let script = null;
     const cleanup = () => {
       if (done) return;
       done = true;
@@ -338,7 +339,7 @@ function fetchSheet(sheetName){
                 "/gviz/tq?sheet=" + encodeURIComponent(sheetName) +
                 "&tqx=out:json;responseHandler:" + cb;
 
-    const script = document.createElement("script");
+    script = document.createElement("script");
     script.src = url;
     script.onerror = () => {
       clearTimeout(timer);
@@ -522,7 +523,7 @@ function saveCompanyInfo(){
 }
 
 // ============================================================
-// WEIGHING
+// WEIGHING — product picker
 // ============================================================
 async function renderWeighingProductPicker(){
   const c=document.getElementById("module-content");
@@ -530,9 +531,19 @@ async function renderWeighingProductPicker(){
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
-    c.innerHTML=`<div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
-      <input class="search" id="w-search" placeholder="Search product…"/>
-      <div id="w-list"></div>`;
+
+    c.innerHTML=`<div class="info-banner">
+      ${productsWithBOM.size} of ${products.length} products have a BOM.
+      <div style="font-size:11px;opacity:0.8;margin-top:8px;font-family:monospace">
+        BOM tab: "${esc(SHEETS.bom)}"<br>
+        BOM log: ${esc(fetchLog[SHEETS.bom] || "(none)")}<br>
+        Raw_Materials tab: "${esc(SHEETS.raw_materials)}"<br>
+        Raw log: ${esc(fetchLog[SHEETS.raw_materials] || "(none)")}
+      </div>
+    </div>
+    <input class="search" id="w-search" placeholder="Search product…"/>
+    <div id="w-list"></div>`;
+
     const render=(q="")=>{
       const list=document.getElementById("w-list");
       const query=q.trim().toLowerCase();
@@ -605,7 +616,11 @@ async function showWeighingForProduct(productCode){
       <button class="action-btn green" onclick="printBOM('${esc(product.code)}')">🖨️ Print BOM</button>
     </div>`;
   if(materials.length === 0){
-    html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
+    html += `<div class="empty"><b>BOM not yet added for this product.</b><br><br>
+      <span style="font-size:12px">BOM rows in memory: ${state.bom.length}<br>
+      Raw materials in memory: ${state.rawMaterials.length}<br>
+      BOM log: ${esc(fetchLog[SHEETS.bom] || "(none)")}<br>
+      Raw log: ${esc(fetchLog[SHEETS.raw_materials] || "(none)")}</span></div>`;
     c.innerHTML = html; return;
   }
   materials.forEach((m, idx)=>{
