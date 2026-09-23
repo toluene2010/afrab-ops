@@ -64,6 +64,7 @@
   .alert-pill.expired{background:#374151;color:#cbd5e1}
 
   .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
+  .err-banner{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
 </style>
 </head>
 <body>
@@ -91,50 +92,42 @@
 </div>
 
 <script>
-// ============================================================
-// YOUR DATA SOURCES
-// ============================================================
 const SHEET_URLS = {
   products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
   raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
   bom:           "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=55512345&single=true&output=csv",
 };
 
-// ============================================================
-// CORS fallback — direct first, then proxies only if needed
-// ============================================================
 const PROXIES = [
   url => url,
+  url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
   url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
-  url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+  url => "https://everyorigin.jwvbremen.nl/api/get?url=" + encodeURIComponent(url),
 ];
 
+const fetchLog = {};
+
 async function fetchCSV(url){
-  let lastErr = null;
-  for(const wrap of PROXIES){
+  const log = [];
+  for(let i=0;i<PROXIES.length;i++){
     try{
-      const finalUrl = wrap(url);
+      const finalUrl = PROXIES[i](url);
       const r = await fetch(finalUrl, {cache:"no-store"});
-      if(!r.ok) throw new Error("HTTP " + r.status);
       const txt = await r.text();
-      if(txt && txt.length > 5) return txt;
-      throw new Error("Empty response");
+      log.push(`proxy[${i}] status=${r.status} len=${txt.length} head=${JSON.stringify(txt.slice(0,120))}`);
+      if(r.ok && txt && txt.length > 5) {
+        fetchLog[url] = log.join("\n");
+        return txt;
+      }
     }catch(e){
-      lastErr = e;
+      log.push(`proxy[${i}] ERROR ${e.message}`);
     }
   }
-  throw new Error("Fetch failed: " + (lastErr ? lastErr.message : "unknown"));
+  fetchLog[url] = log.join("\n");
+  throw new Error("Failed to fetch");
 }
 
-// ============================================================
-// STATE
-// ============================================================
-const state = {
-  role: localStorage.getItem("afrab.role") || null,
-  products: [],
-  rawMaterials: [],
-  bom: [],
-};
+const state = { role: localStorage.getItem("afrab.role")||null, products: [], rawMaterials: [], bom: [] };
 
 const ROLES = [
   { id:"packing",  label:"Packing Supervisor",   icon:"🧴" },
@@ -165,9 +158,6 @@ const ROLE_MODULES = {
   admin:["packing","filling","receipt","batch","shrink","coding","weighing","admin"],
 };
 
-// ============================================================
-// INIT & NAV
-// ============================================================
 function init(){ state.role ? showHome() : showRolePicker(); updateNet(); }
 function updateNet(){
   const d=document.getElementById("net-dot"), t=document.getElementById("net-text");
@@ -175,14 +165,12 @@ function updateNet(){
   else{d.classList.add("offline");t.textContent="Offline";}
 }
 addEventListener("online",updateNet);addEventListener("offline",updateNet);
-
 function setStatus(s){document.getElementById("status-text").textContent=s;}
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   window.scrollTo(0,0);
 }
-
 function showRolePicker(){
   const g=document.getElementById("role-grid");g.innerHTML="";
   ROLES.forEach(r=>{
@@ -193,7 +181,6 @@ function showRolePicker(){
   });
   showScreen("screen-role");
 }
-
 function showHome(){
   const role=state.role, info=ROLES.find(r=>r.id===role);
   const pill=document.getElementById("role-pill");
@@ -209,22 +196,9 @@ function showHome(){
     t.onclick=()=>openModule(m);
     grid.appendChild(t);
   });
-
-  // Debug button (Admin only)
-  if(role === "admin"){
-    const t=document.createElement("button");
-    t.className="module";
-    t.style.borderColor = "#f59e0b";
-    t.innerHTML = `<div class="icon">🔍</div><div><div class="label">Debug URLs</div><div class="sub">Check data sources</div></div>`;
-    t.onclick = showDebug;
-    grid.appendChild(t);
-  }
-
   showScreen("screen-home");
 }
-
 function goHome(){showHome();}
-
 function openModule(id){
   document.getElementById("module-title").textContent=MODULES[id].title;
   const c=document.getElementById("module-content");
@@ -235,9 +209,6 @@ function openModule(id){
   else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
-// ============================================================
-// CSV PARSER
-// ============================================================
 function parseCSV(t){
   const rows=[];let cur=[],f="",inq=false;
   for(let i=0;i<t.length;i++){const c=t[i];
@@ -250,7 +221,6 @@ function parseCSV(t){
   const headers=rows[0].map(x=>x.trim());
   return {headers, rows: rows.slice(1)};
 }
-
 function parseSimpleCSV(t){
   const {headers, rows} = parseCSV(t);
   const out=[];
@@ -262,7 +232,6 @@ function parseSimpleCSV(t){
   }
   return {headers, rows: out};
 }
-
 function findCol(headers, ...keywords){
   for(const k of keywords){
     const idx = headers.findIndex(h=>h.toLowerCase().includes(k.toLowerCase()));
@@ -271,13 +240,9 @@ function findCol(headers, ...keywords){
   return null;
 }
 
-// ============================================================
-// LOADERS
-// ============================================================
 async function loadProducts(){
   if(state.products.length) return state.products;
   const url=SHEET_URLS.products;
-  if(!url||url.includes("PASTE_")) throw new Error("Products URL not configured");
   const txt=await fetchCSV(url);
   const {headers, rows} = parseSimpleCSV(txt);
   const cCode = findCol(headers, "product code","code");
@@ -289,57 +254,55 @@ async function loadProducts(){
     .map(x => ({code:x[cCode].trim(), name:(x[cName]||"").trim()}));
   return state.products;
 }
-
 async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
-  const url=SHEET_URLS.raw_materials;
-  if(!url||url.includes("PASTE_")) return [];
-  const txt=await fetchCSV(url);
-  const {headers, rows} = parseSimpleCSV(txt);
-  const cCode  = findCol(headers, "material code");
-  const cName  = findCol(headers, "material name");
-  const cBatch = findCol(headers, "batch no","batch","lot");
-  const cQC    = findCol(headers, "qc");
-  const cMFG   = findCol(headers, "mfg","manufactur");
-  const cEXP   = findCol(headers, "expir","exp");
-  const cStat  = findCol(headers, "status");
-  state.rawMaterials = rows
-    .filter(x => x[cCode]?.trim())
-    .map(x => ({
-      code:  (x[cCode]||"").trim(),
-      name:  (x[cName]||"").trim(),
-      batch: cBatch ? (x[cBatch]||"").trim() : "",
-      qc:    (x[cQC]||"").trim(),
-      mfg:   (x[cMFG]||"").trim(),
-      exp:   (x[cEXP]||"").trim(),
-      status: cStat ? (x[cStat]||"").trim() : "Active",
-    }));
+  try{
+    const url=SHEET_URLS.raw_materials;
+    const txt=await fetchCSV(url);
+    const {headers, rows} = parseSimpleCSV(txt);
+    const cCode = findCol(headers, "material code");
+    const cName = findCol(headers, "material name");
+    const cBatch= findCol(headers, "batch no","batch","lot");
+    const cQC   = findCol(headers, "qc");
+    const cMFG  = findCol(headers, "mfg","manufactur");
+    const cEXP  = findCol(headers, "expir","exp");
+    const cStat = findCol(headers, "status");
+    state.rawMaterials = rows
+      .filter(x => x[cCode]?.trim())
+      .map(x => ({
+        code: (x[cCode]||"").trim(), name: (x[cName]||"").trim(),
+        batch:cBatch?(x[cBatch]||"").trim():"",
+        qc:(x[cQC]||"").trim(), mfg:(x[cMFG]||"").trim(),
+        exp:(x[cEXP]||"").trim(),
+        status:cStat?(x[cStat]||"").trim():"Active",
+      }));
+  }catch(e){ state.rawMaterials = []; }
   return state.rawMaterials;
 }
-
 async function loadBOM(){
   if(state.bom.length) return state.bom;
-  const url=SHEET_URLS.bom;
-  if(!url||url.includes("PASTE_")) return [];
-  const txt=await fetchCSV(url);
-  const {headers, rows} = parseSimpleCSV(txt);
-  const cProd = findCol(headers, "product code","product");
-  const cMat  = findCol(headers, "material code","material");
-  state.bom = rows
-    .filter(x => x[cProd]?.trim() && x[cMat]?.trim())
-    .map(x => ({product:(x[cProd]||"").trim(), material:(x[cMat]||"").trim()}));
+  try{
+    const url=SHEET_URLS.bom;
+    const txt=await fetchCSV(url);
+    const {headers, rows} = parseSimpleCSV(txt);
+    const cProd = findCol(headers, "product code","product");
+    const cMat  = findCol(headers, "material code","material");
+    state.bom = rows
+      .filter(x => x[cProd]?.trim() && x[cMat]?.trim())
+      .map(x => ({product:(x[cProd]||"").trim(), material:(x[cMat]||"").trim()}));
+  }catch(e){ state.bom = []; }
   return state.bom;
 }
 
-// ============================================================
-// ADMIN
-// ============================================================
 async function renderAdmin(){
   const c=document.getElementById("module-content");
   c.innerHTML=`<div class="loading">Loading products…</div>`;
   try{
     const p=await loadProducts();
     setStatus(`${p.length} products loaded`);
+    if(p.length === 0){
+      throw new Error("0 products returned");
+    }
     c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/>
       <div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products</div>
       <div id="prod-list"></div>`;
@@ -352,27 +315,41 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    c.innerHTML=`<div class="empty">Could not load products.<br><br><b>${esc(err.message)}</b></div>`;
+    const log = fetchLog[SHEET_URLS.products] || "(no log — fetch may not have started)";
+    c.innerHTML=`<div class="err-banner">Products failed to load.
+
+URL:
+${SHEET_URLS.products}
+
+LOG:
+${log}
+
+Error: ${err.message}</div>
+    <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
 
-// ============================================================
-// WEIGHING MODULE
-// ============================================================
 async function renderWeighingProductPicker(){
   const c=document.getElementById("module-content");
   c.innerHTML=`<div class="loading">Loading products & BOM…</div>`;
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
+    if(products.length === 0){
+      const log = fetchLog[SHEET_URLS.products] || "(no log)";
+      c.innerHTML=`<div class="err-banner">Products failed to load.
 
-    c.innerHTML=`
-      <div class="info-banner">
-        ${productsWithBOM.size} of ${products.length} products have a BOM.
-      </div>
+URL:
+${SHEET_URLS.products}
+
+LOG:
+${log}</div>
+      <button class="back-btn" onclick="goHome()">← Back</button>`;
+      return;
+    }
+    c.innerHTML=`<div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
       <input class="search" id="w-search" placeholder="Search product…"/>
       <div id="w-list"></div>`;
-
     const render=(q="")=>{
       const list=document.getElementById("w-list");
       const query=q.trim().toLowerCase();
@@ -392,7 +369,8 @@ async function renderWeighingProductPicker(){
     render();
     document.getElementById("w-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    c.innerHTML=`<div class="empty">Could not load: <b>${esc(err.message)}</b></div>`;
+    c.innerHTML=`<div class="err-banner">Failed: ${err.message}</div>
+      <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
 
@@ -401,171 +379,70 @@ async function showWeighingForProduct(productCode){
   const product = state.products.find(p=>p.code===productCode);
   const bomItems = state.bom.filter(b=>b.product===productCode);
   const today = new Date();
-
-  const materials = bomItems.map(b=>{
-    const matches = state.rawMaterials.filter(r=>r.code===b.material);
-    return {materialCode: b.material, records: matches};
-  });
-
+  const materials = bomItems.map(b=>({
+    materialCode: b.material,
+    records: state.rawMaterials.filter(r=>r.code===b.material),
+  }));
   function parseFlexibleDate(str, isExpiry){
     if(!str) return null;
     str = String(str).trim();
     if(!str) return null;
-
     let m = str.match(/^(\d{4})[-\/](\d{1,2})([-\/](\d{1,2}))?$/);
-    if(m){
-      const y = parseInt(m[1]);
-      const mo = parseInt(m[2]) - 1;
-      const d = m[4] ? parseInt(m[4]) : (isExpiry ? new Date(y, mo + 1, 0).getDate() : 1);
-      return new Date(y, mo, d);
-    }
-
+    if(m){const y=+m[1],mo=+m[2]-1,d=m[4]?+m[4]:(isExpiry?new Date(y,mo+1,0).getDate():1);return new Date(y,mo,d);}
     m = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/);
-    if(m){
-      const d  = parseInt(m[1]);
-      const mo = parseInt(m[2]) - 1;
-      const y  = parseInt(m[3]);
-      return new Date(y, mo, d);
-    }
-
+    if(m){return new Date(+m[3],+m[2]-1,+m[1]);}
     m = str.match(/^(\d{1,2})[-\/](\d{4})$/);
-    if(m){
-      const mo = parseInt(m[1]) - 1;
-      const y  = parseInt(m[2]);
-      const d  = isExpiry ? new Date(y, mo + 1, 0).getDate() : 1;
-      return new Date(y, mo, d);
-    }
-
-    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    if(m){const mo=+m[1]-1,y=+m[2],d=isExpiry?new Date(y,mo+1,0).getDate():1;return new Date(y,mo,d);}
+    const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
     m = str.match(/^([A-Za-z]{3,})[\s\-\/](\d{4})$/);
-    if(m){
-      const mo = months[m[1].slice(0,3).toLowerCase()];
-      if(mo !== undefined){
-        const y = parseInt(m[2]);
-        const d = isExpiry ? new Date(y, mo + 1, 0).getDate() : 1;
-        return new Date(y, mo, d);
-      }
-    }
-
-    const native = new Date(str);
-    if(!isNaN(native)) return native;
-    return null;
+    if(m){const mo=months[m[1].slice(0,3).toLowerCase()];if(mo!==undefined){const y=+m[2],d=isExpiry?new Date(y,mo+1,0).getDate():1;return new Date(y,mo,d);}}
+    const n=new Date(str); return isNaN(n)?null:n;
   }
-
-  function daysUntil(dateStr){
-    const d = parseFlexibleDate(dateStr, true);
-    if(!d) return null;
-    return Math.floor((d - today) / (1000*60*60*24));
+  function daysUntil(s){const d=parseFlexibleDate(s,true);if(!d)return null;return Math.floor((d-today)/86400000);}
+  function statusFor(days,status){
+    if(status && status.trim().toLowerCase()==="finished")return{cls:"expired",label:"FINISHED",pill:"expired"};
+    if(days===null)return{cls:"",label:"—",pill:"ok"};
+    if(days<0)return{cls:"expired",label:`EXPIRED ${Math.abs(days)}d ago`,pill:"expired"};
+    if(days<30)return{cls:"danger",label:`URGENT ${days}d`,pill:"danger"};
+    if(days<90)return{cls:"warn",label:`${days}d left`,pill:"warn"};
+    return{cls:"",label:`${days}d left`,pill:"ok"};
   }
-
-  function statusFor(days, statusText){
-    if(statusText && statusText.trim().toLowerCase() === "finished")
-      return {cls:"expired", label:"FINISHED", pill:"expired"};
-    if(days === null)
-      return {cls:"", label:"—", pill:"ok"};
-    if(days < 0)
-      return {cls:"expired", label:`EXPIRED ${Math.abs(days)} days ago`, pill:"expired"};
-    if(days < 30)
-      return {cls:"danger", label:`URGENT — ${days} days left`, pill:"danger"};
-    if(days < 90)
-      return {cls:"warn", label:`${days} days left`, pill:"warn"};
-    return {cls:"", label:`${days} days left`, pill:"ok"};
-  }
-
-  let html = `
-    <button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
+  let html=`<button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
     <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:16px">
       <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
       <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(product.name)}</div>
     </div>`;
-
   if(materials.length === 0){
     html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
-    c.innerHTML = html;
-    return;
+    c.innerHTML = html; return;
   }
-
   materials.forEach((m, idx)=>{
     html += `<div style="margin-bottom:14px">
       <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
-    
     if(m.records.length === 0){
-      html += `<div class="material-card expired">
-        <div class="mat-code">${esc(m.materialCode)}</div>
-        <div class="mat-name">Not in Raw Materials sheet</div>
-      </div>`;
+      html += `<div class="material-card expired"><div class="mat-code">${esc(m.materialCode)}</div>
+        <div class="mat-name">Not in Raw Materials sheet</div></div>`;
     } else {
       m.records.forEach(rec=>{
-        const days = daysUntil(rec.exp);
-        const st = statusFor(days, rec.status);
+        const days=daysUntil(rec.exp);
+        const st=statusFor(days,rec.status);
         html += `<div class="material-card ${st.cls}">
-          <div class="mat-row">
-            <span class="mat-code">${esc(rec.code)}</span>
-            <span class="alert-pill ${st.pill}">${st.label}</span>
-          </div>
+          <div class="mat-row"><span class="mat-code">${esc(rec.code)}</span>
+            <span class="alert-pill ${st.pill}">${st.label}</span></div>
           <div class="mat-name">${esc(rec.name)}</div>
           <div class="mat-detail">
             <span class="mat-label">Batch No:</span><span class="mat-value">${esc(rec.batch||"—")}</span>
             <span class="mat-label">QC No:</span><span class="mat-value">${esc(rec.qc||"—")}</span>
             <span class="mat-label">MFG Date:</span><span class="mat-value">${esc(rec.mfg||"—")}</span>
             <span class="mat-label">Expiry:</span><span class="mat-value">${esc(rec.exp||"—")}</span>
-          </div>
-        </div>`;
+          </div></div>`;
       });
     }
     html += `</div>`;
   });
-
   c.innerHTML = html;
 }
 
-// ============================================================
-// DEBUG PANEL
-// ============================================================
-async function debugFetch(label, url){
-  const out = [];
-  out.push("=== " + label + " ===");
-  for(let i = 0; i < PROXIES.length; i++){
-    try{
-      const finalUrl = PROXIES[i](url);
-      const r = await fetch(finalUrl, {cache:"no-store"});
-      const txt = await r.text();
-      out.push(`proxy[${i}] → status ${r.status}, length ${txt.length}`);
-      if(txt.length > 0){
-        out.push("  first 250: " + txt.slice(0, 250).replace(/\s+/g, " "));
-      }
-    }catch(e){
-      out.push(`proxy[${i}] → ERROR: ${e.message}`);
-    }
-  }
-  return out.join("\n");
-}
-
-async function showDebug(){
-  const c = document.getElementById("module-content");
-  c.innerHTML = `<div class="loading">Testing all URLs... (about 10 seconds)</div>`;
-  const lines = [];
-  lines.push("PRODUCTS URL:      " + SHEET_URLS.products);
-  lines.push("");
-  lines.push("RAW_MATERIALS URL: " + SHEET_URLS.raw_materials);
-  lines.push("");
-  lines.push("BOM URL:           " + SHEET_URLS.bom);
-  lines.push("");
-  lines.push("TESTING...");
-  lines.push("");
-  lines.push(await debugFetch("PRODUCTS", SHEET_URLS.products));
-  lines.push("");
-  lines.push(await debugFetch("RAW_MATERIALS", SHEET_URLS.raw_materials));
-  lines.push("");
-  lines.push(await debugFetch("BOM", SHEET_URLS.bom));
-
-  c.innerHTML = `<pre style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text);padding:10px;background:var(--panel);border-radius:8px;line-height:1.5">${esc(lines.join("\n"))}</pre>
-  <button class="back-btn" style="margin-top:12px" onclick="goHome()">← Back</button>`;
-}
-
-// ============================================================
-// UTIL
-// ============================================================
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 if("serviceWorker" in navigator){
