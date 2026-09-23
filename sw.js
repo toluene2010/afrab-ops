@@ -1,4 +1,4 @@
-const CACHE = "afrab-ops-v2";   // ← was v1, now v2
+const CACHE = "afrab-ops-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", e => {
@@ -15,11 +15,14 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
+
+  // Google Sheets — always try network, fall back to cache
   if (url.hostname.includes("docs.google.com") || url.hostname.includes("googleusercontent")) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     return;
   }
-  // Network-first for HTML — always try fresh, fall back to cache if offline
+
+  // HTML pages — network-first (always try to get fresh)
   if (e.request.mode === "navigate" || e.request.destination === "document") {
     e.respondWith(
       fetch(e.request).then(res => {
@@ -30,7 +33,8 @@ self.addEventListener("fetch", e => {
     );
     return;
   }
-  // Cache-first for static assets
+
+  // Everything else — cache-first
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       const copy = res.clone();
