@@ -7,7 +7,7 @@
 <title>AFRAB Operations</title>
 <link rel="manifest" href="manifest.json">
 <style>
-  :root{--bg:#0f172a;--panel:#1e293b;--border:#334155;--text:#e2e8f0;--dim:#94a3b8;--accent:#0ea5e9;--green:#22c55e;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6}
+  :root{--bg:#0f172a;--panel:#1e293b;--border:#334155;--text:#e2e8f0;--dim:#94a3b8;--accent:#0ea5e9;--green:#22c55e;--orange:#f59e0b;--red:#ef4444}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
   .screen{display:none;padding:16px 16px 70px 16px}
@@ -92,7 +92,7 @@
 
 <script>
 // ============================================================
-// YOUR DATA SOURCES — all three tabs, published as CSV
+// YOUR DATA SOURCES — all three tabs
 // ============================================================
 const SHEET_URLS = {
   products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
@@ -263,8 +263,9 @@ async function loadRawMaterials(){
   if(!r.ok) throw new Error("Raw Materials: HTTP "+r.status);
   const txt=await r.text();
   const {headers, rows} = parseSimpleCSV(txt);
-  const cCode  = findCol(headers, "material code","code");
-  const cName  = findCol(headers, "material name","name");
+  const cCode  = findCol(headers, "material code");
+  const cName  = findCol(headers, "material name");
+  const cBatch = findCol(headers, "batch no","batch","lot");
   const cQC    = findCol(headers, "qc");
   const cMFG   = findCol(headers, "mfg","manufactur");
   const cEXP   = findCol(headers, "expir","exp");
@@ -272,11 +273,12 @@ async function loadRawMaterials(){
   state.rawMaterials = rows
     .filter(x => x[cCode]?.trim())
     .map(x => ({
-      code: (x[cCode]||"").trim(),
-      name: (x[cName]||"").trim(),
-      qc:   (x[cQC]||"").trim(),
-      mfg:  (x[cMFG]||"").trim(),
-      exp:  (x[cEXP]||"").trim(),
+      code:  (x[cCode]||"").trim(),
+      name:  (x[cName]||"").trim(),
+      batch: cBatch ? (x[cBatch]||"").trim() : "",
+      qc:    (x[cQC]||"").trim(),
+      mfg:   (x[cMFG]||"").trim(),
+      exp:   (x[cEXP]||"").trim(),
       status: cStat ? (x[cStat]||"").trim() : "Active",
     }));
   return state.rawMaterials;
@@ -336,7 +338,6 @@ async function renderWeighingProductPicker(){
     c.innerHTML=`
       <div class="info-banner">
         ${productsWithBOM.size} of ${products.length} products have a BOM.
-        Products without a BOM will show "BOM not yet added".
       </div>
       <input class="search" id="w-search" placeholder="Search product…"/>
       <div id="w-list"></div>`;
@@ -375,18 +376,68 @@ async function showWeighingForProduct(productCode){
     return {materialCode: b.material, records: matches};
   });
 
+  function parseFlexibleDate(str, isExpiry){
+    if(!str) return null;
+    str = String(str).trim();
+    if(!str) return null;
+
+    let m = str.match(/^(\d{4})[-\/](\d{1,2})([-\/](\d{1,2}))?$/);
+    if(m){
+      const y = parseInt(m[1]);
+      const mo = parseInt(m[2]) - 1;
+      const d = m[4] ? parseInt(m[4]) : (isExpiry ? new Date(y, mo + 1, 0).getDate() : 1);
+      return new Date(y, mo, d);
+    }
+
+    m = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/);
+    if(m){
+      const d  = parseInt(m[1]);
+      const mo = parseInt(m[2]) - 1;
+      const y  = parseInt(m[3]);
+      return new Date(y, mo, d);
+    }
+
+    m = str.match(/^(\d{1,2})[-\/](\d{4})$/);
+    if(m){
+      const mo = parseInt(m[1]) - 1;
+      const y  = parseInt(m[2]);
+      const d  = isExpiry ? new Date(y, mo + 1, 0).getDate() : 1;
+      return new Date(y, mo, d);
+    }
+
+    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    m = str.match(/^([A-Za-z]{3,})[\s\-\/](\d{4})$/);
+    if(m){
+      const mo = months[m[1].slice(0,3).toLowerCase()];
+      if(mo !== undefined){
+        const y = parseInt(m[2]);
+        const d = isExpiry ? new Date(y, mo + 1, 0).getDate() : 1;
+        return new Date(y, mo, d);
+      }
+    }
+
+    const native = new Date(str);
+    if(!isNaN(native)) return native;
+    return null;
+  }
+
   function daysUntil(dateStr){
-    if(!dateStr) return null;
-    const d = new Date(dateStr);
-    if(isNaN(d)) return null;
+    const d = parseFlexibleDate(dateStr, true);
+    if(!d) return null;
     return Math.floor((d - today) / (1000*60*60*24));
   }
+
   function statusFor(days, statusText){
-    if(statusText && statusText.trim().toLowerCase() === "finished") return {cls:"expired", label:"FINISHED", pill:"expired"};
-    if(days === null) return {cls:"", label:"—", pill:"ok"};
-    if(days < 0) return {cls:"expired", label:`EXPIRED ${Math.abs(days)} days ago`, pill:"expired"};
-    if(days < 30) return {cls:"danger", label:`URGENT — ${days} days left`, pill:"danger"};
-    if(days < 90) return {cls:"warn", label:`${days} days left`, pill:"warn"};
+    if(statusText && statusText.trim().toLowerCase() === "finished")
+      return {cls:"expired", label:"FINISHED", pill:"expired"};
+    if(days === null)
+      return {cls:"", label:"—", pill:"ok"};
+    if(days < 0)
+      return {cls:"expired", label:`EXPIRED ${Math.abs(days)} days ago`, pill:"expired"};
+    if(days < 30)
+      return {cls:"danger", label:`URGENT — ${days} days left`, pill:"danger"};
+    if(days < 90)
+      return {cls:"warn", label:`${days} days left`, pill:"warn"};
     return {cls:"", label:`${days} days left`, pill:"ok"};
   }
 
@@ -398,11 +449,7 @@ async function showWeighingForProduct(productCode){
     </div>`;
 
   if(materials.length === 0){
-    html += `<div class="empty">
-      <b>BOM not yet added for this product.</b><br><br>
-      Ask admin to add the raw materials for <b>${esc(product.name)}</b> in the BOM tab of the master sheet.<br><br>
-      The app will then show them here automatically.
-    </div>`;
+    html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
     c.innerHTML = html;
     return;
   }
@@ -415,10 +462,6 @@ async function showWeighingForProduct(productCode){
       html += `<div class="material-card expired">
         <div class="mat-code">${esc(m.materialCode)}</div>
         <div class="mat-name">Not in Raw Materials sheet</div>
-        <div class="mat-detail">
-          <span class="mat-label">Note:</span>
-          <span class="mat-value">Add this material to the Raw_Materials tab</span>
-        </div>
       </div>`;
     } else {
       m.records.forEach(rec=>{
@@ -431,6 +474,7 @@ async function showWeighingForProduct(productCode){
           </div>
           <div class="mat-name">${esc(rec.name)}</div>
           <div class="mat-detail">
+            <span class="mat-label">Batch No:</span><span class="mat-value">${esc(rec.batch||"—")}</span>
             <span class="mat-label">QC No:</span><span class="mat-value">${esc(rec.qc||"—")}</span>
             <span class="mat-label">MFG Date:</span><span class="mat-value">${esc(rec.mfg||"—")}</span>
             <span class="mat-label">Expiry:</span><span class="mat-value">${esc(rec.exp||"—")}</span>
