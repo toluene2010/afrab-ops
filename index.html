@@ -131,11 +131,9 @@
 
 <script>
 // ============================================================
-// SPREADSHEET — your master sheet ID
+// SPREADSHEET + TABS
 // ============================================================
 const SPREADSHEET_ID = "1mwo5IXXrIu4bnqR8GOV1qNxQ31rdfdUjeLfBQf22t1M";
-
-// Tab names in the sheet (exact)
 const SHEETS = {
   products:      "Drug database",
   raw_materials: "Raw_Materials",
@@ -174,7 +172,6 @@ function getShrinkPending(){
   try{ return JSON.parse(localStorage.getItem("afrab.shrink.pending")) || []; }catch(e){ return []; }
 }
 function saveShrinkPending(list){ localStorage.setItem("afrab.shrink.pending", JSON.stringify(list)); }
-
 function getCodingPending(){
   try{ return JSON.parse(localStorage.getItem("afrab.coding.pending")) || []; }catch(e){ return []; }
 }
@@ -282,43 +279,75 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH — uses Google gviz/tq (no CORS, no proxies, no Apps Script)
+// FETCH VIA JSONP — bypasses CORS completely
+// Uses gviz/tq loaded as <script> with a callback
 // ============================================================
 const fetchLog = {};
 
-async function fetchSheet(sheetName){
-  const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
-              "/gviz/tq?tqx=out:json&sheet=" + encodeURIComponent(sheetName);
-  try{
-    const r = await fetch(url, {cache: "no-store"});
-    const txt = await r.text();
-    fetchLog[sheetName] = "status=" + r.status + " len=" + txt.length;
-    if(!r.ok) throw new Error("HTTP " + r.status);
-    const start = txt.indexOf("{");
-    const end = txt.lastIndexOf("}");
-    if(start < 0 || end < 0) throw new Error("No JSON found");
-    const json = JSON.parse(txt.slice(start, end + 1));
-    if(!json.table) throw new Error("No table in response");
-    const cols = (json.table.cols || []).map(c => String(c.label || c.id || "").trim());
-    const rows = (json.table.rows || []).map(row => {
-      const obj = {};
-      (row.c || []).forEach((cell, i) => {
-        const key = cols[i];
-        if(!key) return;
-        let val = "";
-        if(cell){
-          if(cell.f !== undefined && cell.f !== null) val = cell.f;
-          else if(cell.v !== undefined && cell.v !== null) val = cell.v;
+function fetchSheet(sheetName){
+  return new Promise((resolve, reject) => {
+    const cb = "gviz_cb_" + Math.random().toString(36).slice(2);
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      try { delete window[cb]; } catch(e){}
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      fetchLog[sheetName] = "TIMEOUT after 20s";
+      reject(new Error("Timeout"));
+    }, 20000);
+
+    window[cb] = function(data){
+      clearTimeout(timer);
+      try {
+        if (!data || data.status !== "ok" || !data.table) {
+          fetchLog[sheetName] = "Bad response: " + (data && data.status);
+          cleanup();
+          reject(new Error("Invalid response"));
+          return;
         }
-        obj[key] = val === null || val === undefined ? "" : String(val);
-      });
-      return obj;
-    });
-    return rows;
-  }catch(e){
-    fetchLog[sheetName] = "ERROR: " + e.message;
-    throw e;
-  }
+        const cols = (data.table.cols || []).map(c => String(c.label || c.id || "").trim());
+        const rows = (data.table.rows || []).map(row => {
+          const obj = {};
+          (row.c || []).forEach((cell, i) => {
+            const key = cols[i];
+            if(!key) return;
+            let val = "";
+            if(cell){
+              if(cell.f !== undefined && cell.f !== null) val = cell.f;
+              else if(cell.v !== undefined && cell.v !== null) val = cell.v;
+            }
+            obj[key] = val === null || val === undefined ? "" : String(val);
+          });
+          return obj;
+        });
+        fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + cols.length;
+        cleanup();
+        resolve(rows);
+      } catch(err){
+        cleanup();
+        fetchLog[sheetName] = "Parse error: " + err.message;
+        reject(err);
+      }
+    };
+
+    const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
+                "/gviz/tq?sheet=" + encodeURIComponent(sheetName) +
+                "&tqx=out:json;responseHandler:" + cb;
+
+    const script = document.createElement("script");
+    script.src = url;
+    script.onerror = () => {
+      clearTimeout(timer);
+      fetchLog[sheetName] = "Script load failed";
+      cleanup();
+      reject(new Error("Script load failed"));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 function findKey(obj, ...keywords){
