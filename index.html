@@ -92,13 +92,41 @@
 
 <script>
 // ============================================================
-// YOUR DATA SOURCES — all three tabs
+// YOUR DATA SOURCES
 // ============================================================
 const SHEET_URLS = {
   products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
   raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
   bom:           "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=55512345&single=true&output=csv",
 };
+
+// ============================================================
+// CORS PROXY — fixes "Failed to fetch" on mobile browsers
+// Primary: allorigins.win, fallback: corsproxy.io
+// ============================================================
+const PROXIES = [
+  url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+  url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+  url => url, // direct (last resort)
+];
+
+async function fetchCSV(url){
+  let lastErr = null;
+  for(const wrap of PROXIES){
+    try{
+      const finalUrl = wrap(url);
+      const r = await fetch(finalUrl, {cache:"no-store"});
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      const txt = await r.text();
+      if(txt && txt.length > 5) return txt;
+      throw new Error("Empty response");
+    }catch(e){
+      lastErr = e;
+      // try next proxy
+    }
+  }
+  throw new Error("All proxies failed: " + (lastErr ? lastErr.message : "unknown"));
+}
 
 // ============================================================
 // STATE
@@ -241,9 +269,7 @@ async function loadProducts(){
   if(state.products.length) return state.products;
   const url=SHEET_URLS.products;
   if(!url||url.includes("PASTE_")) throw new Error("Products URL not configured");
-  const r=await fetch(url,{cache:"no-store"});
-  if(!r.ok) throw new Error("Products: HTTP "+r.status);
-  const txt=await r.text();
+  const txt=await fetchCSV(url);
   const {headers, rows} = parseSimpleCSV(txt);
   const cCode = findCol(headers, "product code","code");
   const cName = findCol(headers, "product name","name");
@@ -259,9 +285,7 @@ async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
   const url=SHEET_URLS.raw_materials;
   if(!url||url.includes("PASTE_")) return [];
-  const r=await fetch(url,{cache:"no-store"});
-  if(!r.ok) throw new Error("Raw Materials: HTTP "+r.status);
-  const txt=await r.text();
+  const txt=await fetchCSV(url);
   const {headers, rows} = parseSimpleCSV(txt);
   const cCode  = findCol(headers, "material code");
   const cName  = findCol(headers, "material name");
@@ -288,9 +312,7 @@ async function loadBOM(){
   if(state.bom.length) return state.bom;
   const url=SHEET_URLS.bom;
   if(!url||url.includes("PASTE_")) return [];
-  const r=await fetch(url,{cache:"no-store"});
-  if(!r.ok) throw new Error("BOM: HTTP "+r.status);
-  const txt=await r.text();
+  const txt=await fetchCSV(url);
   const {headers, rows} = parseSimpleCSV(txt);
   const cProd = findCol(headers, "product code","product");
   const cMat  = findCol(headers, "material code","material");
