@@ -37,6 +37,9 @@
   .search{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);margin-bottom:12px}
   .search:focus{outline:none;border-color:var(--accent)}
   .back-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:13px;cursor:pointer;margin-bottom:16px}
+  .action-btn{background:var(--accent);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;margin-right:8px;margin-bottom:8px}
+  .action-btn.alt{background:#475569}
+  .action-btn.green{background:var(--green)}
 
   .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
   .loading{text-align:center;padding:40px 20px;color:var(--dim)}
@@ -45,10 +48,11 @@
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
   .dot.offline{background:var(--red)}
 
-  .material-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;border-left:5px solid var(--green)}
+  .material-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;border-left:5px solid var(--green);position:relative}
   .material-card.warn{border-left-color:var(--orange)}
   .material-card.danger{border-left-color:var(--red)}
   .material-card.expired{border-left-color:#475569;opacity:0.7}
+  .material-card.done{opacity:0.5;border-left-color:#475569}
 
   .mat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
   .mat-code{font-family:monospace;color:var(--dim);font-size:12px}
@@ -56,6 +60,8 @@
   .mat-detail{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
   .mat-label{color:var(--dim)}
   .mat-value{color:var(--text);font-family:monospace}
+  .mark-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;margin-top:10px}
+  .unmark-btn{background:transparent;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;margin-top:10px}
 
   .alert-pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-top:8px}
   .alert-pill.ok{background:#14532d;color:#86efac}
@@ -65,6 +71,28 @@
 
   .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
   .err-banner{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
+
+  .field{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);margin-bottom:10px}
+  .field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
+
+  /* PRINT STYLES */
+  .print-only { display: none; }
+  @media print {
+    body { background: white; color: black; }
+    .screen, .status-bar, .back-btn { display: none !important; }
+    .print-only { display: block !important; padding: 20px; color: black; font-family: 'Times New Roman', serif; }
+    .print-header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; }
+    .print-header h1 { font-size: 22px; margin: 0 0 6px 0; color: black; }
+    .print-header .addr { font-size: 13px; line-height: 1.5; color: black; }
+    .print-title { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; text-transform: uppercase; }
+    .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 20px; }
+    .print-meta b { display: inline-block; min-width: 100px; }
+    .print-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+    .print-table th, .print-table td { border: 1px solid #000; padding: 6px 8px; text-align: left; vertical-align: top; }
+    .print-table th { background: #eee; font-weight: bold; }
+    .print-sign { display: flex; justify-content: space-between; margin-top: 40px; font-size: 13px; }
+    .print-sign div { border-top: 1px solid #000; width: 40%; padding-top: 4px; }
+  }
 </style>
 </head>
 <body>
@@ -91,7 +119,12 @@
   <span id="status-text">Ready</span>
 </div>
 
+<div id="print-area" class="print-only"></div>
+
 <script>
+// ============================================================
+// CONFIG
+// ============================================================
 const SHEET_URLS = {
   products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
   raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
@@ -105,8 +138,41 @@ const PROXIES = [
   url => "https://everyorigin.jwvbremen.nl/api/get?url=" + encodeURIComponent(url),
 ];
 
-const fetchLog = {};
+// ============================================================
+// COMPANY INFO — edit in Admin, saved on this phone
+// ============================================================
+const COMPANY_DEFAULT = {
+  name:    "AFRAB PHARMACEUTICALS LTD",
+  address: "123 Industrial Avenue, Lagos, Nigeria",
+  phone:   "+234 806 521 1837",
+  email:   "info@afrab.com",
+};
+function getCompany(){
+  try{ return JSON.parse(localStorage.getItem("afrab.company")) || COMPANY_DEFAULT; }
+  catch(e){ return COMPANY_DEFAULT; }
+}
+function saveCompany(c){ localStorage.setItem("afrab.company", JSON.stringify(c)); }
 
+// ============================================================
+// FINISHED MATERIALS — local only, saved on this phone
+// ============================================================
+function getFinishedKey(code, qc){
+  return "afrab.finished." + code + "|" + (qc||"");
+}
+function isLocallyFinished(code, qc){
+  return localStorage.getItem(getFinishedKey(code, qc)) === "1";
+}
+function markFinished(code, qc){
+  localStorage.setItem(getFinishedKey(code, qc), "1");
+}
+function unmarkFinished(code, qc){
+  localStorage.removeItem(getFinishedKey(code, qc));
+}
+
+// ============================================================
+// FETCH
+// ============================================================
+const fetchLog = {};
 async function fetchCSV(url){
   const log = [];
   for(let i=0;i<PROXIES.length;i++){
@@ -114,20 +180,22 @@ async function fetchCSV(url){
       const finalUrl = PROXIES[i](url);
       const r = await fetch(finalUrl, {cache:"no-store"});
       const txt = await r.text();
-      log.push(`proxy[${i}] status=${r.status} len=${txt.length} head=${JSON.stringify(txt.slice(0,120))}`);
-      if(r.ok && txt && txt.length > 5) {
-        fetchLog[url] = log.join("\n");
-        return txt;
-      }
-    }catch(e){
-      log.push(`proxy[${i}] ERROR ${e.message}`);
-    }
+      log.push(`proxy[${i}] status=${r.status} len=${txt.length}`);
+      if(r.ok && txt && txt.length > 5) { fetchLog[url] = log.join("\n"); return txt; }
+    }catch(e){ log.push(`proxy[${i}] ERROR ${e.message}`); }
   }
   fetchLog[url] = log.join("\n");
   throw new Error("Failed to fetch");
 }
 
-const state = { role: localStorage.getItem("afrab.role")||null, products: [], rawMaterials: [], bom: [] };
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  role: localStorage.getItem("afrab.role")||null,
+  products: [], rawMaterials: [], bom: [],
+  currentProduct: null,
+};
 
 const ROLES = [
   { id:"packing",  label:"Packing Supervisor",   icon:"🧴" },
@@ -158,6 +226,9 @@ const ROLE_MODULES = {
   admin:["packing","filling","receipt","batch","shrink","coding","weighing","admin"],
 };
 
+// ============================================================
+// INIT & NAV
+// ============================================================
 function init(){ state.role ? showHome() : showRolePicker(); updateNet(); }
 function updateNet(){
   const d=document.getElementById("net-dot"), t=document.getElementById("net-text");
@@ -196,6 +267,13 @@ function showHome(){
     t.onclick=()=>openModule(m);
     grid.appendChild(t);
   });
+  if(role === "admin"){
+    const t=document.createElement("button");
+    t.className="module"; t.style.borderColor="#f59e0b";
+    t.innerHTML = `<div class="icon">🏢</div><div><div class="label">Company Info</div><div class="sub">Edit report header</div></div>`;
+    t.onclick = renderCompanySettings;
+    grid.appendChild(t);
+  }
   showScreen("screen-home");
 }
 function goHome(){showHome();}
@@ -209,6 +287,9 @@ function openModule(id){
   else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
+// ============================================================
+// CSV PARSER
+// ============================================================
 function parseCSV(t){
   const rows=[];let cur=[],f="",inq=false;
   for(let i=0;i<t.length;i++){const c=t[i];
@@ -240,6 +321,9 @@ function findCol(headers, ...keywords){
   return null;
 }
 
+// ============================================================
+// LOADERS
+// ============================================================
 async function loadProducts(){
   if(state.products.length) return state.products;
   const url=SHEET_URLS.products;
@@ -294,15 +378,16 @@ async function loadBOM(){
   return state.bom;
 }
 
+// ============================================================
+// ADMIN PRODUCTS
+// ============================================================
 async function renderAdmin(){
   const c=document.getElementById("module-content");
   c.innerHTML=`<div class="loading">Loading products…</div>`;
   try{
     const p=await loadProducts();
     setStatus(`${p.length} products loaded`);
-    if(p.length === 0){
-      throw new Error("0 products returned");
-    }
+    if(p.length === 0) throw new Error("0 products returned");
     c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/>
       <div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products</div>
       <div id="prod-list"></div>`;
@@ -315,20 +400,50 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    const log = fetchLog[SHEET_URLS.products] || "(no log — fetch may not have started)";
-    c.innerHTML=`<div class="err-banner">Products failed to load.
-
-URL:
-${SHEET_URLS.products}
-
-LOG:
-${log}
-
-Error: ${err.message}</div>
-    <button class="back-btn" onclick="goHome()">← Back</button>`;
+    const log = fetchLog[SHEET_URLS.products] || "(no log)";
+    c.innerHTML=`<div class="err-banner">Products failed to load.\n\n${log}\n\nError: ${err.message}</div>
+      <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
 
+// ============================================================
+// COMPANY SETTINGS
+// ============================================================
+function renderCompanySettings(){
+  document.getElementById("module-title").textContent="Company Info";
+  const c=document.getElementById("module-content");
+  const co = getCompany();
+  c.innerHTML = `
+    <p style="color:var(--dim);font-size:13px;margin-bottom:16px">
+      These details appear on printed BOM reports.
+    </p>
+    <label class="field-label">Company Name</label>
+    <input class="field" id="co-name" value="${esc(co.name)}"/>
+    <label class="field-label">Address</label>
+    <input class="field" id="co-addr" value="${esc(co.address)}"/>
+    <label class="field-label">Phone</label>
+    <input class="field" id="co-phone" value="${esc(co.phone)}"/>
+    <label class="field-label">Email</label>
+    <input class="field" id="co-email" value="${esc(co.email)}"/>
+    <button class="action-btn green" onclick="saveCompanyInfo()">Save</button>
+    <button class="action-btn alt" onclick="goHome()">Cancel</button>
+  `;
+  showScreen("screen-module");
+}
+function saveCompanyInfo(){
+  saveCompany({
+    name:    document.getElementById("co-name").value.trim(),
+    address: document.getElementById("co-addr").value.trim(),
+    phone:   document.getElementById("co-phone").value.trim(),
+    email:   document.getElementById("co-email").value.trim(),
+  });
+  setStatus("Company info saved");
+  goHome();
+}
+
+// ============================================================
+// WEIGHING — product picker
+// ============================================================
 async function renderWeighingProductPicker(){
   const c=document.getElementById("module-content");
   c.innerHTML=`<div class="loading">Loading products & BOM…</div>`;
@@ -337,14 +452,8 @@ async function renderWeighingProductPicker(){
     const productsWithBOM = new Set(bom.map(x=>x.product));
     if(products.length === 0){
       const log = fetchLog[SHEET_URLS.products] || "(no log)";
-      c.innerHTML=`<div class="err-banner">Products failed to load.
-
-URL:
-${SHEET_URLS.products}
-
-LOG:
-${log}</div>
-      <button class="back-btn" onclick="goHome()">← Back</button>`;
+      c.innerHTML=`<div class="err-banner">Products failed to load.\n\n${log}</div>
+        <button class="back-btn" onclick="goHome()">← Back</button>`;
       return;
     }
     c.innerHTML=`<div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
@@ -374,15 +483,34 @@ ${log}</div>
   }
 }
 
+// ============================================================
+// WEIGHING — material view (with mark-finished + print)
+// ============================================================
 async function showWeighingForProduct(productCode){
   const c=document.getElementById("module-content");
   const product = state.products.find(p=>p.code===productCode);
+  state.currentProduct = product;
   const bomItems = state.bom.filter(b=>b.product===productCode);
   const today = new Date();
-  const materials = bomItems.map(b=>({
-    materialCode: b.material,
-    records: state.rawMaterials.filter(r=>r.code===b.material),
-  }));
+
+  // For each BOM material, gather all records
+  const materials = bomItems.map(b=>{
+    const all = state.rawMaterials.filter(r=>r.code===b.material);
+    // Mark finished: respect both sheet status AND local override
+    const enriched = all.map(r=>({
+      ...r,
+      sheetFinished: (r.status||"").trim().toLowerCase() === "finished",
+      localFinished: isLocallyFinished(r.code, r.qc),
+    }));
+    const active = enriched.filter(r => !r.sheetFinished && !r.localFinished);
+    const finishedList = enriched.filter(r => r.sheetFinished || r.localFinished);
+    return {
+      materialCode: b.material,
+      active, finishedList,
+      total: all.length,
+    };
+  });
+
   function parseFlexibleDate(str, isExpiry){
     if(!str) return null;
     str = String(str).trim();
@@ -399,35 +527,51 @@ async function showWeighingForProduct(productCode){
     const n=new Date(str); return isNaN(n)?null:n;
   }
   function daysUntil(s){const d=parseFlexibleDate(s,true);if(!d)return null;return Math.floor((d-today)/86400000);}
-  function statusFor(days,status){
-    if(status && status.trim().toLowerCase()==="finished")return{cls:"expired",label:"FINISHED",pill:"expired"};
+  function statusFor(days){
     if(days===null)return{cls:"",label:"—",pill:"ok"};
     if(days<0)return{cls:"expired",label:`EXPIRED ${Math.abs(days)}d ago`,pill:"expired"};
     if(days<30)return{cls:"danger",label:`URGENT ${days}d`,pill:"danger"};
     if(days<90)return{cls:"warn",label:`${days}d left`,pill:"warn"};
     return{cls:"",label:`${days}d left`,pill:"ok"};
   }
+
   let html=`<button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
-    <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:16px">
+    <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
       <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(product.name)}</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <button class="action-btn green" onclick="printBOM('${esc(product.code)}')">🖨️ Print BOM</button>
     </div>`;
+
   if(materials.length === 0){
     html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
     c.innerHTML = html; return;
   }
+
   materials.forEach((m, idx)=>{
     html += `<div style="margin-bottom:14px">
       <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
-    if(m.records.length === 0){
-      html += `<div class="material-card expired"><div class="mat-code">${esc(m.materialCode)}</div>
-        <div class="mat-name">Not in Raw Materials sheet</div></div>`;
+
+    if(m.active.length === 0 && m.finishedList.length === 0){
+      html += `<div class="material-card expired">
+        <div class="mat-code">${esc(m.materialCode)}</div>
+        <div class="mat-name">Not in Raw Materials sheet</div>
+      </div>`;
+    } else if(m.active.length === 0){
+      html += `<div class="material-card done">
+        <div class="mat-code">${esc(m.materialCode)}</div>
+        <div class="mat-name">✓ All batches finished (${m.finishedList.length})</div>
+        <button class="unmark-btn" onclick="showFinishedBatch('${esc(m.materialCode)}')">Show finished</button>
+      </div>`;
     } else {
-      m.records.forEach(rec=>{
+      m.active.forEach(rec=>{
         const days=daysUntil(rec.exp);
-        const st=statusFor(days,rec.status);
+        const st=statusFor(days);
+        const safeCode = esc(rec.code);
+        const safeQc   = esc(rec.qc||"");
         html += `<div class="material-card ${st.cls}">
-          <div class="mat-row"><span class="mat-code">${esc(rec.code)}</span>
+          <div class="mat-row"><span class="mat-code">${safeCode}</span>
             <span class="alert-pill ${st.pill}">${st.label}</span></div>
           <div class="mat-name">${esc(rec.name)}</div>
           <div class="mat-detail">
@@ -435,12 +579,128 @@ async function showWeighingForProduct(productCode){
             <span class="mat-label">QC No:</span><span class="mat-value">${esc(rec.qc||"—")}</span>
             <span class="mat-label">MFG Date:</span><span class="mat-value">${esc(rec.mfg||"—")}</span>
             <span class="mat-label">Expiry:</span><span class="mat-value">${esc(rec.exp||"—")}</span>
-          </div></div>`;
+          </div>
+          <button class="mark-btn" onclick="confirmMarkFinished('${safeCode}','${safeQc}','${esc(rec.batch||"")}')">Mark as Finished</button>
+        </div>`;
       });
     }
     html += `</div>`;
   });
   c.innerHTML = html;
+}
+
+// ============================================================
+// MARK AS FINISHED (local only for now)
+// ============================================================
+function confirmMarkFinished(code, qc, batch){
+  const msg = `Mark this batch as finished?\n\nMaterial: ${code}\nQC No: ${qc||"—"}\nBatch: ${batch||"—"}\n\nIt will be hidden from this phone.`;
+  if(confirm(msg)){
+    markFinished(code, qc);
+    setStatus("Marked finished");
+    if(state.currentProduct) showWeighingForProduct(state.currentProduct.code);
+  }
+}
+
+function showFinishedBatch(code){
+  const records = state.rawMaterials.filter(r=>r.code===code);
+  if(records.length === 0){ alert("No records"); return; }
+  let msg = "Finished batches for " + code + ":\n\n";
+  records.forEach(r=>{
+    const sheetFin = (r.status||"").toLowerCase() === "finished";
+    const localFin = isLocallyFinished(r.code, r.qc);
+    if(sheetFin || localFin){
+      msg += `• QC ${r.qc||"—"} | Batch ${r.batch||"—"} | Exp ${r.exp||"—"}\n  [${sheetFin?"Sheet":"Local"} finished]\n\n`;
+    }
+  });
+  const restore = confirm(msg + "\nRestore ALL local-finished batches? (Sheet-finished ones cannot be restored from here.)");
+  if(restore){
+    records.forEach(r=>{ if(isLocallyFinished(r.code, r.qc)) unmarkFinished(r.code, r.qc); });
+    setStatus("Restored");
+    if(state.currentProduct) showWeighingForProduct(state.currentProduct.code);
+  }
+}
+
+// ============================================================
+// PRINT BOM
+// ============================================================
+function printBOM(productCode){
+  const product = state.products.find(p=>p.code===productCode);
+  const bomItems = state.bom.filter(b=>b.product===productCode);
+  const co = getCompany();
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0,10);
+  const timeStr = today.toTimeString().slice(0,5);
+
+  // Gather active materials
+  const rows = [];
+  bomItems.forEach((b, idx)=>{
+    const all = state.rawMaterials.filter(r=>r.code===b.material);
+    const active = all.filter(r=>{
+      const s = (r.status||"").toLowerCase();
+      return s !== "finished" && s !== "expired" && !isLocallyFinished(r.code, r.qc);
+    });
+    if(active.length === 0){
+      rows.push({
+        n: idx+1, code: b.material, name: "(no active batch)", 
+        batch: "—", qc: "—", mfg: "—", exp: "—"
+      });
+    } else {
+      active.forEach(r=>{
+        rows.push({
+          n: idx+1, code: r.code, name: r.name,
+          batch: r.batch||"—", qc: r.qc||"—", mfg: r.mfg||"—", exp: r.exp||"—",
+        });
+      });
+    }
+  });
+
+  const tableRows = rows.map(r=>`
+    <tr>
+      <td>${r.n}</td>
+      <td>${esc(r.code)}</td>
+      <td>${esc(r.name)}</td>
+      <td>${esc(r.batch)}</td>
+      <td>${esc(r.qc)}</td>
+      <td>${esc(r.mfg)}</td>
+      <td>${esc(r.exp)}</td>
+    </tr>`).join("");
+
+  const area = document.getElementById("print-area");
+  area.innerHTML = `
+    <div class="print-header">
+      <h1>${esc(co.name)}</h1>
+      <div class="addr">
+        ${esc(co.address)}<br>
+        ${co.phone ? "Phone: " + esc(co.phone) : ""}${co.email ? " &nbsp;|&nbsp; Email: " + esc(co.email) : ""}
+      </div>
+    </div>
+
+    <div class="print-title">Bill of Materials</div>
+
+    <div class="print-meta">
+      <div><b>Product:</b> ${esc(product.name)}</div>
+      <div><b>Product Code:</b> ${esc(product.code)}</div>
+      <div><b>Date Printed:</b> ${dateStr} ${timeStr}</div>
+      <div><b>Total Materials:</b> ${rows.length}</div>
+    </div>
+
+    <table class="print-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Code</th><th>Material Name</th>
+          <th>Batch No</th><th>QC No</th><th>MFG Date</th><th>Expiry Date</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <div class="print-sign">
+      <div>Prepared by</div>
+      <div>Checked by</div>
+    </div>
+  `;
+
+  setTimeout(()=>window.print(), 100);
 }
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
