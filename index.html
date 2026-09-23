@@ -7,10 +7,10 @@
 <title>AFRAB Operations</title>
 <link rel="manifest" href="manifest.json">
 <style>
-  :root{--bg:#0f172a;--panel:#1e293b;--border:#334155;--text:#e2e8f0;--dim:#94a3b8;--accent:#0ea5e9;--green:#22c55e;--orange:#f59e0b;--red:#ef4444}
+  :root{--bg:#0f172a;--panel:#1e293b;--border:#334155;--text:#e2e8f0;--dim:#94a3b8;--accent:#0ea5e9;--green:#22c55e;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
-  .screen{display:none;padding:16px 16px 60px 16px}
+  .screen{display:none;padding:16px 16px 70px 16px}
   .screen.active{display:block}
   header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
   h1{font-size:20px;margin:0;color:var(--accent)}
@@ -28,17 +28,43 @@
   .module.receipt{border-color:#f59e0b}.module.batch{border-color:#8b5cf6}
   .module.shrink{border-color:#ec4899}.module.coding{border-color:#22c55e}
   .module.weighing{border-color:#0ea5e9}.module.admin{border-color:#64748b}
-  .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+
+  .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+  .product-item:active{background:#273449}
   .product-item .code{color:var(--dim);font-size:12px;font-family:monospace}
   .product-item .name{font-size:14px;margin-top:4px}
+
   .search{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);margin-bottom:12px}
   .search:focus{outline:none;border-color:var(--accent)}
   .back-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:13px;cursor:pointer;margin-bottom:16px}
+
   .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
   .loading{text-align:center;padding:40px 20px;color:var(--dim)}
-  .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:10px 16px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between}
+
+  .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:10px 16px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;z-index:10}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
   .dot.offline{background:var(--red)}
+
+  /* Material cards */
+  .material-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;border-left:5px solid var(--green)}
+  .material-card.warn{border-left-color:var(--orange)}
+  .material-card.danger{border-left-color:var(--red)}
+  .material-card.expired{border-left-color:#475569;opacity:0.7}
+
+  .mat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .mat-code{font-family:monospace;color:var(--dim);font-size:12px}
+  .mat-name{font-size:15px;font-weight:600;margin:4px 0 10px 0}
+  .mat-detail{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+  .mat-label{color:var(--dim)}
+  .mat-value{color:var(--text);font-family:monospace}
+
+  .alert-pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-top:8px}
+  .alert-pill.ok{background:#14532d;color:#86efac}
+  .alert-pill.warn{background:#78350f;color:#fdba74}
+  .alert-pill.danger{background:#7f1d1d;color:#fecaca}
+  .alert-pill.expired{background:#374151;color:#cbd5e1}
+
+  .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
 </style>
 </head>
 <body>
@@ -67,17 +93,24 @@
 
 <script>
 // ============================================================
-// YOUR DATA SOURCES
+// YOUR DATA SOURCES  — paste your CSV URLs here
 // ============================================================
 const SHEET_URLS = {
-  // Products tab — your published CSV URL
   products: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
+  // Paste these two when ready — leave as-is until then
+  raw_materials: "PASTE_RAW_MATERIALS_CSV_URL_HERE",
+  bom: "PASTE_BOM_CSV_URL_HERE",
 };
 
 // ============================================================
-// STATE & CONFIG
+// STATE
 // ============================================================
-const state = { role: localStorage.getItem("afrab.role") || null, products: [] };
+const state = {
+  role: localStorage.getItem("afrab.role") || null,
+  products: [],
+  rawMaterials: [],
+  bom: [],
+};
 
 const ROLES = [
   { id:"packing",  label:"Packing Supervisor",   icon:"🧴" },
@@ -109,7 +142,7 @@ const ROLE_MODULES = {
 };
 
 // ============================================================
-// INIT
+// INIT & NAV
 // ============================================================
 function init(){ state.role ? showHome() : showRolePicker(); updateNet(); }
 function updateNet(){
@@ -163,23 +196,13 @@ function openModule(id){
   c.innerHTML=`<div class="loading">Loading…</div>`;
   showScreen("screen-module");
   if(id==="admin") renderAdmin();
-  else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.<br><br>Design is locked. This screen is built after Products loads correctly.</div>`;
+  else if(id==="weighing") renderWeighingProductPicker();
+  else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
 // ============================================================
-// PRODUCTS LOADER
+// CSV PARSER (generic)
 // ============================================================
-async function loadProducts(){
-  if(state.products.length) return state.products;
-  const url=SHEET_URLS.products;
-  if(!url||url.includes("PASTE_")) throw new Error("Products URL not configured");
-  const r=await fetch(url,{cache:"no-store"});
-  if(!r.ok) throw new Error("HTTP "+r.status);
-  const txt=await r.text();
-  state.products=parseCSV(txt);
-  return state.products;
-}
-
 function parseCSV(t){
   const rows=[];let cur=[],f="",inq=false;
   for(let i=0;i<t.length;i++){const c=t[i];
@@ -188,18 +211,94 @@ function parseCSV(t){
       else if(c==="\n"){cur.push(f);rows.push(cur);cur=[];f="";}
       else if(c!=="\r")f+=c;}}
   if(f||cur.length){cur.push(f);rows.push(cur);}
-  if(!rows.length)return[];
-  // Find the header row
-  const h=rows[0].map(x=>x.trim().toLowerCase());
-  const ci=h.findIndex(x=>x.includes("code"));
-  const ni=h.findIndex(x=>x.includes("name"));
-  const ai=h.findIndex(x=>x.includes("active"));
+  if(!rows.length)return{headers:[],rows:[]};
+  const headers=rows[0].map(x=>x.trim());
+  return {headers, rows: rows.slice(1)};
+}
+
+function parseSimpleCSV(t){
+  const {headers, rows} = parseCSV(t);
+  const h = headers.map(x=>x.toLowerCase());
   const out=[];
-  for(let i=1;i<rows.length;i++){const r=rows[i];
-    if(!r.length||!r[ci]?.trim())continue;
-    if(ai>=0&&r[ai]?.trim().toUpperCase()==="NO")continue;
-    out.push({code:r[ci].trim(),name:r[ni]?.trim()||""});}
-  return out;
+  for(const r of rows){
+    if(!r.length || !r[0]?.trim()) continue;
+    const obj = {};
+    headers.forEach((hh,i)=>{ obj[hh]=r[i]; });
+    out.push(obj);
+  }
+  return {headers, rows: out};
+}
+
+function findCol(headers, ...keywords){
+  for(const k of keywords){
+    const idx = headers.findIndex(h=>h.toLowerCase().includes(k.toLowerCase()));
+    if(idx >= 0) return headers[idx];
+  }
+  return null;
+}
+
+// ============================================================
+// LOADERS
+// ============================================================
+async function loadProducts(){
+  if(state.products.length) return state.products;
+  const url=SHEET_URLS.products;
+  if(!url||url.includes("PASTE_")) throw new Error("Products URL not configured");
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok) throw new Error("Products: HTTP "+r.status);
+  const txt=await r.text();
+  const {headers, rows} = parseSimpleCSV(txt);
+  const cCode = findCol(headers, "product code","code");
+  const cName = findCol(headers, "product name","name");
+  const cActive = findCol(headers, "active");
+  state.products = rows
+    .filter(x => x[cCode]?.trim())
+    .filter(x => !cActive || (x[cActive]||"").trim().toUpperCase() !== "NO")
+    .map(x => ({code:x[cCode].trim(), name:(x[cName]||"").trim()}));
+  return state.products;
+}
+
+async function loadRawMaterials(){
+  if(state.rawMaterials.length) return state.rawMaterials;
+  const url=SHEET_URLS.raw_materials;
+  if(!url||url.includes("PASTE_")) return []; // not configured yet
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok) throw new Error("Raw Materials: HTTP "+r.status);
+  const txt=await r.text();
+  const {headers, rows} = parseSimpleCSV(txt);
+  const cCode  = findCol(headers, "material code","code");
+  const cName  = findCol(headers, "material name","name");
+  const cQC    = findCol(headers, "qc");
+  const cMFG   = findCol(headers, "mfg","manufactur");
+  const cEXP   = findCol(headers, "expir","exp");
+  const cStat  = findCol(headers, "status");
+  state.rawMaterials = rows
+    .filter(x => x[cCode]?.trim())
+    .map(x => ({
+      code: (x[cCode]||"").trim(),
+      name: (x[cName]||"").trim(),
+      qc:   (x[cQC]||"").trim(),
+      mfg:  (x[cMFG]||"").trim(),
+      exp:  (x[cEXP]||"").trim(),
+      status: cStat ? (x[cStat]||"").trim() : "Active",
+    }));
+  return state.rawMaterials;
+}
+
+async function loadBOM(){
+  if(state.bom.length) return state.bom;
+  const url=SHEET_URLS.bom;
+  if(!url||url.includes("PASTE_")) return [];
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok) throw new Error("BOM: HTTP "+r.status);
+  const txt=await r.text();
+  const {headers, rows} = parseSimpleCSV(txt);
+  const cProd = findCol(headers, "product code","product");
+  const cMat  = findCol(headers, "material code","material");
+  state.bom = rows
+    .filter(x => x[cProd]?.trim() && x[cMat]?.trim())
+    .map(x => ({product:(x[cProd]||"").trim(), material:(x[cMat]||"").trim()}));
+  return state.bom;
 }
 
 // ============================================================
@@ -211,7 +310,9 @@ async function renderAdmin(){
   try{
     const p=await loadProducts();
     setStatus(`${p.length} products loaded`);
-    c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/><div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products loaded from sheet</div><div id="prod-list"></div>`;
+    c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/>
+      <div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products</div>
+      <div id="prod-list"></div>`;
     const render=(q="")=>{
       const list=document.getElementById("prod-list");
       const query=q.trim().toLowerCase();
@@ -221,16 +322,141 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    c.innerHTML=`<div class="empty">Could not load products.<br><br><b>${esc(err.message)}</b><br><br>This usually means the CSV URL is not fully published. Try: File → Share → Publish to web → Products tab → CSV → Publish.</div>`;
-    setStatus("Load failed");
+    c.innerHTML=`<div class="empty">Could not load products.<br><br><b>${esc(err.message)}</b></div>`;
   }
 }
 
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+// ============================================================
+// WEIGHING MODULE
+// ============================================================
+async function renderWeighingProductPicker(){
+  const c=document.getElementById("module-content");
+  c.innerHTML=`<div class="loading">Loading products & BOM…</div>`;
+  try{
+    const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
+
+    // Products that HAVE a BOM entry
+    const productsWithBOM = new Set(bom.map(x=>x.product));
+
+    c.innerHTML=`
+      <div class="info-banner">
+        ${productsWithBOM.size} of ${products.length} products have a BOM.
+        Products without a BOM will show "BOM not yet added".
+      </div>
+      <input class="search" id="w-search" placeholder="Search product…"/>
+      <div id="w-list"></div>`;
+
+    const render=(q="")=>{
+      const list=document.getElementById("w-list");
+      const query=q.trim().toLowerCase();
+      const items=query?products.filter(x=>x.name.toLowerCase().includes(query)||x.code.toLowerCase().includes(query)):products;
+      if(!items.length){list.innerHTML=`<div class="empty">No products match.</div>`;return;}
+      list.innerHTML=items.map(p=>{
+        const hasBOM = productsWithBOM.has(p.code);
+        const badge = hasBOM
+          ? `<span style="color:var(--green);font-size:11px">● BOM ready</span>`
+          : `<span style="color:var(--dim);font-size:11px">● no BOM</span>`;
+        return `<div class="product-item" onclick="showWeighingForProduct('${esc(p.code)}')">
+          <div class="code">${esc(p.code)} &nbsp; ${badge}</div>
+          <div class="name">${esc(p.name)}</div>
+        </div>`;
+      }).join("");
+    };
+    render();
+    document.getElementById("w-search").addEventListener("input",e=>render(e.target.value));
+  }catch(err){
+    c.innerHTML=`<div class="empty">Could not load: <b>${esc(err.message)}</b></div>`;
+  }
+}
+
+async function showWeighingForProduct(productCode){
+  const c=document.getElementById("module-content");
+  const product = state.products.find(p=>p.code===productCode);
+  const bomItems = state.bom.filter(b=>b.product===productCode);
+  const today = new Date();
+
+  // Match each BOM entry to raw material records
+  const materials = bomItems.map(b=>{
+    const matches = state.rawMaterials.filter(r=>r.code===b.material);
+    return {materialCode: b.material, records: matches};
+  });
+
+  // Compute expiry status
+  function daysUntil(dateStr){
+    if(!dateStr) return null;
+    const d = new Date(dateStr);
+    if(isNaN(d)) return null;
+    return Math.floor((d - today) / (1000*60*60*24));
+  }
+  function statusFor(days, statusText){
+    if(statusText && statusText.trim().toLowerCase() === "finished") return {cls:"expired", label:"FINISHED", pill:"expired"};
+    if(days === null) return {cls:"", label:"—", pill:"ok"};
+    if(days < 0) return {cls:"expired", label:`EXPIRED ${Math.abs(days)} days ago`, pill:"expired"};
+    if(days < 30) return {cls:"danger", label:`URGENT — ${days} days left`, pill:"danger"};
+    if(days < 90) return {cls:"warn", label:`${days} days left`, pill:"warn"};
+    return {cls:"", label:`${days} days left`, pill:"ok"};
+  }
+
+  let html = `
+    <button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
+    <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
+      <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(product.name)}</div>
+    </div>`;
+
+  if(materials.length === 0){
+    html += `<div class="empty">
+      <b>BOM not yet added for this product.</b><br><br>
+      Ask admin to add the raw materials for <b>${esc(product.name)}</b> in the BOM tab of the master sheet.<br><br>
+      The app will then show them here automatically.
+    </div>`;
+    c.innerHTML = html;
+    return;
+  }
+
+  materials.forEach((m, idx)=>{
+    const matName = m.records[0]?.name || "(unknown material)";
+    html += `<div style="margin-bottom:14px">
+      <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
+    
+    if(m.records.length === 0){
+      html += `<div class="material-card expired">
+        <div class="mat-code">${esc(m.materialCode)}</div>
+        <div class="mat-name">Not in Raw Materials sheet</div>
+        <div class="mat-detail">
+          <span class="mat-label">Note:</span>
+          <span class="mat-value">Add this material to the Raw_Materials tab</span>
+        </div>
+      </div>`;
+    } else {
+      m.records.forEach(rec=>{
+        const days = daysUntil(rec.exp);
+        const st = statusFor(days, rec.status);
+        html += `<div class="material-card ${st.cls}">
+          <div class="mat-row">
+            <span class="mat-code">${esc(rec.code)}</span>
+            <span class="alert-pill ${st.pill}">${st.label}</span>
+          </div>
+          <div class="mat-name">${esc(rec.name)}</div>
+          <div class="mat-detail">
+            <span class="mat-label">QC No:</span><span class="mat-value">${esc(rec.qc||"—")}</span>
+            <span class="mat-label">MFG Date:</span><span class="mat-value">${esc(rec.mfg||"—")}</span>
+            <span class="mat-label">Expiry:</span><span class="mat-value">${esc(rec.exp||"—")}</span>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  c.innerHTML = html;
+}
 
 // ============================================================
-// SERVICE WORKER
+// UTIL
 // ============================================================
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
