@@ -104,7 +104,7 @@ const SHEET_URLS = {
 // CORS fallback — direct first, then proxies only if needed
 // ============================================================
 const PROXIES = [
-  url => url, // DIRECT FIRST — this is what works for Products
+  url => url,
   url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
   url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
 ];
@@ -209,6 +209,17 @@ function showHome(){
     t.onclick=()=>openModule(m);
     grid.appendChild(t);
   });
+
+  // Debug button (Admin only)
+  if(role === "admin"){
+    const t=document.createElement("button");
+    t.className="module";
+    t.style.borderColor = "#f59e0b";
+    t.innerHTML = `<div class="icon">🔍</div><div><div class="label">Debug URLs</div><div class="sub">Check data sources</div></div>`;
+    t.onclick = showDebug;
+    grid.appendChild(t);
+  }
+
   showScreen("screen-home");
 }
 
@@ -506,6 +517,50 @@ async function showWeighingForProduct(productCode){
   });
 
   c.innerHTML = html;
+}
+
+// ============================================================
+// DEBUG PANEL
+// ============================================================
+async function debugFetch(label, url){
+  const out = [];
+  out.push("=== " + label + " ===");
+  for(let i = 0; i < PROXIES.length; i++){
+    try{
+      const finalUrl = PROXIES[i](url);
+      const r = await fetch(finalUrl, {cache:"no-store"});
+      const txt = await r.text();
+      out.push(`proxy[${i}] → status ${r.status}, length ${txt.length}`);
+      if(txt.length > 0){
+        out.push("  first 250: " + txt.slice(0, 250).replace(/\s+/g, " "));
+      }
+    }catch(e){
+      out.push(`proxy[${i}] → ERROR: ${e.message}`);
+    }
+  }
+  return out.join("\n");
+}
+
+async function showDebug(){
+  const c = document.getElementById("module-content");
+  c.innerHTML = `<div class="loading">Testing all URLs... (about 10 seconds)</div>`;
+  const lines = [];
+  lines.push("PRODUCTS URL:      " + SHEET_URLS.products);
+  lines.push("");
+  lines.push("RAW_MATERIALS URL: " + SHEET_URLS.raw_materials);
+  lines.push("");
+  lines.push("BOM URL:           " + SHEET_URLS.bom);
+  lines.push("");
+  lines.push("TESTING...");
+  lines.push("");
+  lines.push(await debugFetch("PRODUCTS", SHEET_URLS.products));
+  lines.push("");
+  lines.push(await debugFetch("RAW_MATERIALS", SHEET_URLS.raw_materials));
+  lines.push("");
+  lines.push(await debugFetch("BOM", SHEET_URLS.bom));
+
+  c.innerHTML = `<pre style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text);padding:10px;background:var(--panel);border-radius:8px;line-height:1.5">${esc(lines.join("\n"))}</pre>
+  <button class="back-btn" style="margin-top:12px" onclick="goHome()">← Back</button>`;
 }
 
 // ============================================================
