@@ -45,7 +45,6 @@
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
   .dot.offline{background:var(--red)}
 
-  /* Material cards */
   .material-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;border-left:5px solid var(--green)}
   .material-card.warn{border-left-color:var(--orange)}
   .material-card.danger{border-left-color:var(--red)}
@@ -93,13 +92,12 @@
 
 <script>
 // ============================================================
-// YOUR DATA SOURCES  — paste your CSV URLs here
+// YOUR DATA SOURCES — all three tabs, published as CSV
 // ============================================================
 const SHEET_URLS = {
-  products: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
-  // Paste these two when ready — leave as-is until then
-  raw_materials: "PASTE_RAW_MATERIALS_CSV_URL_HERE",
-  bom: "PASTE_BOM_CSV_URL_HERE",
+  products:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=370230692&single=true&output=csv",
+  raw_materials: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=1200469071&single=true&output=csv",
+  bom:           "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfTXyBX0S_Q236wARJLe68F1hia2FJZVxt3fV6zPE08ZTIG-GDoUun1l2GEbeG6zSwjarJQUtLrbF8/pub?gid=55512345&single=true&output=csv",
 };
 
 // ============================================================
@@ -201,7 +199,7 @@ function openModule(id){
 }
 
 // ============================================================
-// CSV PARSER (generic)
+// CSV PARSER
 // ============================================================
 function parseCSV(t){
   const rows=[];let cur=[],f="",inq=false;
@@ -218,7 +216,6 @@ function parseCSV(t){
 
 function parseSimpleCSV(t){
   const {headers, rows} = parseCSV(t);
-  const h = headers.map(x=>x.toLowerCase());
   const out=[];
   for(const r of rows){
     if(!r.length || !r[0]?.trim()) continue;
@@ -261,7 +258,7 @@ async function loadProducts(){
 async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
   const url=SHEET_URLS.raw_materials;
-  if(!url||url.includes("PASTE_")) return []; // not configured yet
+  if(!url||url.includes("PASTE_")) return [];
   const r=await fetch(url,{cache:"no-store"});
   if(!r.ok) throw new Error("Raw Materials: HTTP "+r.status);
   const txt=await r.text();
@@ -302,7 +299,7 @@ async function loadBOM(){
 }
 
 // ============================================================
-// ADMIN — PRODUCTS LIST
+// ADMIN
 // ============================================================
 async function renderAdmin(){
   const c=document.getElementById("module-content");
@@ -334,8 +331,6 @@ async function renderWeighingProductPicker(){
   c.innerHTML=`<div class="loading">Loading products & BOM…</div>`;
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
-
-    // Products that HAVE a BOM entry
     const productsWithBOM = new Set(bom.map(x=>x.product));
 
     c.innerHTML=`
@@ -375,13 +370,11 @@ async function showWeighingForProduct(productCode){
   const bomItems = state.bom.filter(b=>b.product===productCode);
   const today = new Date();
 
-  // Match each BOM entry to raw material records
   const materials = bomItems.map(b=>{
     const matches = state.rawMaterials.filter(r=>r.code===b.material);
     return {materialCode: b.material, records: matches};
   });
 
-  // Compute expiry status
   function daysUntil(dateStr){
     if(!dateStr) return null;
     const d = new Date(dateStr);
@@ -415,7 +408,6 @@ async function showWeighingForProduct(productCode){
   }
 
   materials.forEach((m, idx)=>{
-    const matName = m.records[0]?.name || "(unknown material)";
     html += `<div style="margin-bottom:14px">
       <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
     
