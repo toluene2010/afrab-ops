@@ -10,7 +10,7 @@
   :root{
     --bg:#0f172a; --panel:#1e293b; --border:#334155; --text:#e2e8f0;
     --dim:#94a3b8; --accent:#33a7b5; --accent2:#7fbbe3; --brand-red:#ff0000;
-    --green:#22c55e; --orange:#f59e0b; --red:#ef4444;
+    --green:#22c55e; --orange:#f59e0b; --red:#ef4444; --purple:#8b5cf6;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
@@ -19,6 +19,7 @@
   header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:10px}
   header img{flex-shrink:0}
   h1{font-size:20px;margin:0;color:var(--accent)}
+  h2{font-size:16px;margin:20px 0 10px 0;color:var(--accent)}
   .role-pill{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;white-space:nowrap}
   .role-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px}
   .role-btn{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:16px;color:var(--text);text-align:left;cursor:pointer}
@@ -33,6 +34,7 @@
   .module.receipt{border-color:#f59e0b}.module.batch{border-color:#8b5cf6}
   .module.shrink{border-color:#ec4899}.module.coding{border-color:var(--green)}
   .module.weighing{border-color:var(--accent)}.module.admin{border-color:#64748b}
+  .module.dashboard{border-color:#facc15}
 
   .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
   .product-item:active{background:#273449}
@@ -47,7 +49,7 @@
   .action-btn.green{background:var(--green)}
   .action-btn.red{background:var(--red)}
   .action-btn.orange{background:var(--orange)}
-  .action-btn.purple{background:#8b5cf6}
+  .action-btn.purple{background:var(--purple)}
 
   .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
   .loading{text-align:center;padding:40px 20px;color:var(--dim)}
@@ -62,13 +64,16 @@
   .material-card.danger{border-left-color:var(--red)}
   .material-card.expired{border-left-color:#475569;opacity:0.7}
   .material-card.done{opacity:0.5;border-left-color:#475569}
+  .material-card.ticked{border-left-color:var(--accent2);box-shadow:0 0 0 2px var(--accent2) inset}
 
-  .mat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .mat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
   .mat-code{font-family:monospace;color:var(--dim);font-size:12px}
   .mat-name{font-size:15px;font-weight:600;margin:4px 0 10px 0}
   .mat-detail{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
   .mat-label{color:var(--dim)}
   .mat-value{color:var(--text);font-family:monospace}
+  .tick-btn{background:transparent;border:2px solid var(--dim);color:var(--dim);border-radius:50%;width:34px;height:34px;font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0}
+  .tick-btn.on{background:var(--green);border-color:var(--green);color:white}
   .mark-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;margin-top:10px}
   .unmark-btn{background:transparent;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;margin-top:10px}
 
@@ -94,8 +99,23 @@
   .remove-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 
   .session-banner{background:#312e81;border:1px solid #6366f1;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#c7d2fe}
+  .batch-pill{display:inline-block;background:var(--purple);color:#fff;padding:4px 10px;border-radius:20px;font-size:13px;font-family:monospace;font-weight:700}
 
-  .batch-pill{display:inline-block;background:#8b5cf6;color:#fff;padding:4px 10px;border-radius:20px;font-size:13px;font-family:monospace;font-weight:700}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .stat-card .stat-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px}
+  .stat-card .stat-value{font-size:22px;font-weight:700;color:var(--text);margin-top:6px}
+  .stat-card .stat-sub{font-size:11px;color:var(--dim);margin-top:4px}
+  .stat-card.accent{border-color:var(--accent)}
+  .stat-card.green{border-color:var(--green)}
+  .stat-card.orange{border-color:var(--orange)}
+  .stat-card.purple{border-color:var(--purple)}
+
+  .list-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
+  .list-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .list-row:last-child{border-bottom:none}
+  .list-row .name{color:var(--text)}
+  .list-row .num{font-family:monospace;color:var(--accent2);font-weight:700}
 
   @media print {
     body { background: white; color: black; font-family: Georgia, 'Times New Roman', serif; }
@@ -167,12 +187,12 @@ const SHEETS = {
   operators:     "operators",
 };
 
-const RECEIPT_SHEET   = "receipt_log";
-const RECEIPT_STORAGE = "afrab.receipt.pending";
-
-// Batch registry is NOT sharded — one tab for the whole year
-const BATCH_REGISTRY_SHEET = "batch_registry";
-const BATCH_STORAGE        = "afrab.batch.pending";
+const RECEIPT_SHEET          = "receipt_log";
+const RECEIPT_STORAGE        = "afrab.receipt.pending";
+const BATCH_REGISTRY_SHEET   = "batch_registry";
+const BATCH_STORAGE          = "afrab.batch.pending";
+const WEIGHING_SHEET         = "weighing_log";
+const WEIGHING_STORAGE       = "afrab.weighing.pending";
 
 const FILLING_LINES = [
   "100ml line (FL 2)",
@@ -184,62 +204,47 @@ const FILLING_LINES = [
 ];
 
 // ============================================================
-// MODULE TEMPLATES (single-item modules)
+// TEMPLATES
 // ============================================================
 const TEMPLATES = {
   shrinkwrap: {
-    title: "Shrinkwrap",
-    sheetName: "shrinkwrap_log",
-    storageKey: "afrab.shrink.pending",
+    title: "Shrinkwrap", sheetName: "shrinkwrap_log", storageKey: "afrab.shrink.pending",
     fields: [
       { key:"batch_no", label:"Batch No", type:"text", placeholder:"e.g. 26001" },
       { key:"machine",  label:"Machine",  type:"picker", source:"machines",  allowCustom:true },
       { key:"operator", label:"Operator", type:"picker", source:"operators", allowCustom:true },
       { key:"qty",      label:"Quantity Shrinkwrapped", type:"number", placeholder:"e.g. 500" },
     ],
-    toRow: (date, e) => ({
-      "Date": date, "Product": e.product, "Product Code": e.productCode,
+    toRow: (date, e) => ({ "Date": date, "Product": e.product, "Product Code": e.productCode,
       "Batch No": e.batch_no, "Machine": e.machine, "Operator": e.operator,
-      "Quantity": e.qty, "Saved At": new Date().toISOString(),
-    }),
+      "Quantity": e.qty, "Saved At": new Date().toISOString() }),
   },
   coding: {
-    title: "Coding",
-    sheetName: "coding_log",
-    storageKey: "afrab.coding.pending",
+    title: "Coding", sheetName: "coding_log", storageKey: "afrab.coding.pending",
     fields: [
       { key:"batch_no", label:"Batch No", type:"text", placeholder:"e.g. 26001" },
       { key:"machine",  label:"Machine",  type:"picker", source:"machines",  allowCustom:true },
       { key:"operator", label:"Operator", type:"picker", source:"operators", allowCustom:true },
       { key:"qty",      label:"Quantity Coded", type:"number", placeholder:"e.g. 500" },
     ],
-    toRow: (date, e) => ({
-      "Date": date, "Product": e.product, "Product Code": e.productCode,
+    toRow: (date, e) => ({ "Date": date, "Product": e.product, "Product Code": e.productCode,
       "Batch No": e.batch_no, "Machine": e.machine, "Operator": e.operator,
-      "Quantity": e.qty, "Saved At": new Date().toISOString(),
-    }),
+      "Quantity": e.qty, "Saved At": new Date().toISOString() }),
   },
   packing: {
-    title: "Packing",
-    sheetName: "packing_log",
-    storageKey: "afrab.packing.pending",
+    title: "Packing", sheetName: "packing_log", storageKey: "afrab.packing.pending",
     fields: [
       { key:"batch_no",   label:"Batch No",   type:"text",   placeholder:"e.g. 26001" },
       { key:"batch_size", label:"Batch Size", type:"number", placeholder:"e.g. 5000" },
       { key:"packers",    label:"No of Packers", type:"number", placeholder:"e.g. 5" },
       { key:"output",     label:"Output",     type:"number", placeholder:"e.g. 4800" },
     ],
-    toRow: (date, e) => ({
-      "Date": date, "Product": e.product, "Product Code": e.productCode,
+    toRow: (date, e) => ({ "Date": date, "Product": e.product, "Product Code": e.productCode,
       "Batch No": e.batch_no, "Batch Size": e.batch_size,
-      "No of Packers": e.packers, "Output": e.output,
-      "Saved At": new Date().toISOString(),
-    }),
+      "No of Packers": e.packers, "Output": e.output, "Saved At": new Date().toISOString() }),
   },
   filling: {
-    title: "Filling",
-    sheetName: "filling_log",
-    storageKey: "afrab.filling.pending",
+    title: "Filling", sheetName: "filling_log", storageKey: "afrab.filling.pending",
     fields: [
       { key:"batch_no",        label:"Batch No",            type:"text",   placeholder:"e.g. 26001" },
       { key:"filling_line",    label:"Filling Line",        type:"picker", source:"filling_lines", allowCustom:false },
@@ -248,13 +253,11 @@ const TEMPLATES = {
       { key:"downtime",        label:"Machine Downtime",    type:"text",   placeholder:"HH:MM:SS  e.g. 1:55:15" },
       { key:"downtime_reason", label:"Downtime Reason",     type:"text",   placeholder:"e.g. None / Maintenance" },
     ],
-    toRow: (date, e) => ({
-      "Date": date, "Product": e.product, "Product Code": e.productCode,
+    toRow: (date, e) => ({ "Date": date, "Product": e.product, "Product Code": e.productCode,
       "Batch No": e.batch_no, "Filling Line": e.filling_line,
       "No of Personnel": e.no_personnel, "Daily Output": e.output,
       "Machine Downtime": e.downtime, "Downtime Reason": e.downtime_reason,
-      "Saved At": new Date().toISOString(),
-    }),
+      "Saved At": new Date().toISOString() }),
   },
 };
 
@@ -274,7 +277,7 @@ function getCompany(){
 function saveCompany(c){ localStorage.setItem("afrab.company", JSON.stringify(c)); }
 
 // ============================================================
-// FINISHED MATERIALS
+// FINISHED MATERIALS (local only)
 // ============================================================
 function getFinishedKey(code, qc){ return "afrab.finished." + code + "|" + (qc||""); }
 function isLocallyFinished(code, qc){ return localStorage.getItem(getFinishedKey(code, qc)) === "1"; }
@@ -301,11 +304,7 @@ function makeReference(){
   const mi = String(d.getMinutes()).padStart(2,'0');
   return "REC-" + yyyy + mm + dd + "-" + hh + mi;
 }
-
-// Batch number helpers — YYXXX format, resets each year
-function yearPrefix(){
-  return String(new Date().getFullYear()).slice(-2); // "26" for 2026
-}
+function yearPrefix(){ return String(new Date().getFullYear()).slice(-2); }
 function nextBatchNumber(registry){
   const prefix = yearPrefix();
   let maxSeq = 0;
@@ -317,6 +316,25 @@ function nextBatchNumber(registry){
     }
   });
   return prefix + String(maxSeq + 1).padStart(3, '0');
+}
+function currentMonthString(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,'0');
+}
+function todayString(){ return new Date().toISOString().slice(0,10); }
+function parseYMD(s){
+  if(!s) return null;
+  let m = String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = String(s).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  const d = new Date(s); return isNaN(d)?null:d;
+}
+function downtimeToHours(s){
+  if(!s) return 0;
+  const parts = String(s).split(":").map(x=>parseInt(x,10)||0);
+  while(parts.length < 3) parts.push(0);
+  return parts[0] + parts[1]/60 + parts[2]/3600;
 }
 
 // ============================================================
@@ -348,13 +366,14 @@ const MODULES = {
   coding:   { title:"Coding",            sub:"Per coder, per batch",      color:"coding" },
   weighing: { title:"Weighing",          sub:"Raw materials for a batch", color:"weighing" },
   admin:    { title:"Admin",             sub:"Products, machines, etc.",  color:"admin" },
+  dashboard:{ title:"Dashboard",         sub:"Today & month totals",      color:"dashboard" },
 };
 
 const ROLE_MODULES = {
   packing:["packing"], filling:["filling"], receipt:["receipt"],
   batch:["batch"], shrink:["shrink"], coding:["coding"],
   weighing:["weighing"],
-  admin:["packing","filling","receipt","batch","shrink","coding","weighing","admin"],
+  admin:["dashboard","packing","filling","receipt","batch","shrink","coding","weighing","admin"],
 };
 
 // ============================================================
@@ -395,7 +414,8 @@ function showHome(){
     const mi=MODULES[m];
     const t=document.createElement("button");
     t.className=`module ${mi.color}`;
-    t.innerHTML=`<div class="icon">${ROLES.find(r=>r.id===m)?.icon||"•"}</div><div><div class="label">${mi.title}</div><div class="sub">${mi.sub}</div></div>`;
+    const icon = m === "dashboard" ? "📊" : (ROLES.find(r=>r.id===m)?.icon || "•");
+    t.innerHTML=`<div class="icon">${icon}</div><div><div class="label">${mi.title}</div><div class="sub">${mi.sub}</div></div>`;
     t.onclick=()=>openModule(m);
     grid.appendChild(t);
   });
@@ -422,6 +442,7 @@ function openModule(id){
   else if(id==="filling") renderTemplate("filling");
   else if(id==="receipt") renderReceipt();
   else if(id==="batch") renderBatch();
+  else if(id==="dashboard") renderDashboard();
   else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
@@ -480,15 +501,16 @@ function fetchSheet(sheetName){
     document.head.appendChild(script);
   });
 }
+async function safeFetch(sheetName){
+  try { return await fetchSheet(sheetName); } catch(e){ return []; }
+}
 
 // ============================================================
 // WRITE VIA NEW-TAB NAVIGATION
 // ============================================================
 function buildWriteUrl(sheetName, rows){
-  return API_BASE
-    + "?action=append"
-    + "&sheet=" + encodeURIComponent(sheetName)
-    + "&rows=" + encodeURIComponent(JSON.stringify(rows));
+  return API_BASE + "?action=append&sheet=" + encodeURIComponent(sheetName) +
+         "&rows=" + encodeURIComponent(JSON.stringify(rows));
 }
 async function postRows(sheetName, rows){
   if(!rows || !rows.length) return false;
@@ -521,21 +543,15 @@ async function syncPending(sheetName, storageKey){
   setStatus(`Send failed (${pending.length} kept)`);
   return {sent: 0, remaining: pending.length};
 }
-async function syncTemplate(tpl){
-  return syncPending(tpl.sheetName, tpl.storageKey);
-}
+async function syncTemplate(tpl){ return syncPending(tpl.sheetName, tpl.storageKey); }
 async function autoSyncAll(){
   if(!navigator.onLine) return;
-  for(const key of Object.keys(TEMPLATES)){
-    await syncTemplate(TEMPLATES[key]);
-  }
+  for(const key of Object.keys(TEMPLATES)) await syncTemplate(TEMPLATES[key]);
   await syncPending(RECEIPT_SHEET, RECEIPT_STORAGE);
   await syncPending(BATCH_REGISTRY_SHEET, BATCH_STORAGE);
+  await syncPending(WEIGHING_SHEET, WEIGHING_STORAGE);
 }
-function scheduleAutoSync(){
-  setTimeout(autoSyncAll, 5000);
-  setInterval(autoSyncAll, 120000);
-}
+function scheduleAutoSync(){ setTimeout(autoSyncAll, 5000); setInterval(autoSyncAll, 120000); }
 
 function findKey(obj, ...keywords){
   if(!obj) return null;
@@ -623,9 +639,7 @@ async function loadMachines(){
       }
     }
   }catch(e){ }
-  if(state.machines.length === 0){
-    state.machines = DEFAULTS.map(n => ({name:n}));
-  }
+  if(state.machines.length === 0) state.machines = DEFAULTS.map(n => ({name:n}));
   return state.machines;
 }
 async function loadOperators(){
@@ -751,92 +765,216 @@ async function renderWeighingProductPicker(){
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
+
 async function showWeighingForProduct(productCode){
   const c=document.getElementById("module-content");
   const product = state.products.find(p=>p.code===productCode);
   state.currentProduct = product;
   const bomItems = state.bom.filter(b=>b.product===productCode);
   const today = new Date();
-  const materials = bomItems.map(b=>{
-    const all = state.rawMaterials.filter(r=>r.code===b.material);
-    const enriched = all.map(r=>({
-      ...r,
-      sheetFinished: (r.status||"").trim().toLowerCase() === "finished",
-      localFinished: isLocallyFinished(r.code, r.qc),
-    }));
-    const active = enriched.filter(r => !r.sheetFinished && !r.localFinished);
-    const finishedList = enriched.filter(r => r.sheetFinished || r.localFinished);
-    return { materialCode: b.material, active, finishedList, total: all.length };
-  });
-  function parseFlexibleDate(str, isExpiry){
-    if(!str) return null;
-    str = String(str).trim(); if(!str) return null;
-    let m = str.match(/^(\d{4})[-\/](\d{1,2})([-\/](\d{1,2}))?$/);
-    if(m){const y=+m[1],mo=+m[2]-1,d=m[4]?+m[4]:(isExpiry?new Date(y,mo+1,0).getDate():1);return new Date(y,mo,d);}
-    m = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/);
-    if(m){return new Date(+m[3],+m[2]-1,+m[1]);}
-    m = str.match(/^(\d{1,2})[-\/](\d{4})$/);
-    if(m){const mo=+m[1]-1,y=+m[2],d=isExpiry?new Date(y,mo+1,0).getDate():1;return new Date(y,mo,d);}
-    const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    m = str.match(/^([A-Za-z]{3,})[\s\-\/](\d{4})$/);
-    if(m){const mo=months[m[1].slice(0,3).toLowerCase()];if(mo!==undefined){const y=+m[2],d=isExpiry?new Date(y,mo+1,0).getDate():1;return new Date(y,mo,d);}}
-    const n=new Date(str); return isNaN(n)?null:n;
-  }
-  function daysUntil(s){const d=parseFlexibleDate(s,true);if(!d)return null;return Math.floor((d-today)/86400000);}
-  function statusFor(days){
-    if(days===null)return{cls:"",label:"—",pill:"ok"};
-    if(days<0)return{cls:"expired",label:`EXPIRED ${Math.abs(days)}d ago`,pill:"expired"};
-    if(days<30)return{cls:"danger",label:`URGENT ${days}d`,pill:"danger"};
-    if(days<90)return{cls:"warn",label:`${days}d left`,pill:"warn"};
-    return{cls:"",label:`${days}d left`,pill:"ok"};
-  }
-  let html=`<button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
-    <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:12px">
-      <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
-      <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(product.name)}</div>
-    </div>
-    <div style="margin-bottom:14px">
-      <button class="action-btn green" onclick="printBOM('${esc(product.code)}')">🖨️ Print BOM</button>
-    </div>`;
-  if(materials.length === 0){
-    html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
-    c.innerHTML = html; return;
-  }
-  materials.forEach((m, idx)=>{
-    html += `<div style="margin-bottom:14px">
-      <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
-    if(m.active.length === 0 && m.finishedList.length === 0){
-      html += `<div class="material-card expired"><div class="mat-code">${esc(m.materialCode)}</div>
-        <div class="mat-name">Not in Raw Materials sheet</div></div>`;
-    } else if(m.active.length === 0){
-      html += `<div class="material-card done"><div class="mat-code">${esc(m.materialCode)}</div>
-        <div class="mat-name">✓ All batches finished (${m.finishedList.length})</div>
-        <button class="unmark-btn" onclick="showFinishedBatch('${esc(m.materialCode)}')">Show finished</button></div>`;
-    } else {
-      m.active.forEach(rec=>{
-        const days=daysUntil(rec.exp);
-        const st=statusFor(days);
-        const safeCode = esc(rec.code); const safeQc = esc(rec.qc||"");
-        html += `<div class="material-card ${st.cls}">
-          <div class="mat-row"><span class="mat-code">${safeCode}</span>
-            <span class="alert-pill ${st.pill}">${st.label}</span></div>
-          <div class="mat-name">${esc(rec.name)}</div>
-          <div class="mat-detail">
-            <span class="mat-label">Batch No:</span><span class="mat-value">${esc(rec.batch||"—")}</span>
-            <span class="mat-label">QC No:</span><span class="mat-value">${esc(rec.qc||"—")}</span>
-            <span class="mat-label">MFG Date:</span><span class="mat-value">${esc(rec.mfg||"—")}</span>
-            <span class="mat-label">Expiry:</span><span class="mat-value">${esc(rec.exp||"—")}</span>
-          </div>
-          <button class="mark-btn" onclick="confirmMarkFinished('${safeCode}','${safeQc}','${esc(rec.batch||"")}')">Mark as Finished</button>
-        </div>`;
-      });
+
+  const [registry] = await Promise.all([ safeFetch(BATCH_REGISTRY_SHEET) ]);
+  const productBatches = (registry || []).filter(r => String(r["Product Code"]||"").trim() === productCode);
+  const suggestedBatch = productBatches.length
+    ? String(productBatches[productBatches.length-1]["Batch No"]||"").trim()
+    : nextBatchNumber(registry);
+
+  let sessionBatch = suggestedBatch;
+  let sessionStaff = localStorage.getItem("afrab.lastweigher") || "";
+  const ticked = {};
+
+  const renderPage = () => {
+    const materials = bomItems.map(b=>{
+      const all = state.rawMaterials.filter(r=>r.code===b.material);
+      const enriched = all.map(r=>({
+        ...r,
+        sheetFinished: (r.status||"").trim().toLowerCase() === "finished",
+        localFinished: isLocallyFinished(r.code, r.qc),
+      }));
+      const active = enriched.filter(r => !r.sheetFinished && !r.localFinished);
+      const finishedList = enriched.filter(r => r.sheetFinished || r.localFinished);
+      return { materialCode: b.material, active, finishedList, total: all.length };
+    });
+
+    function parseFlexibleDate(str, isExpiry){
+      if(!str) return null;
+      str = String(str).trim(); if(!str) return null;
+      let m = str.match(/^(\d{4})[-\/](\d{1,2})([-\/](\d{1,2}))?$/);
+      if(m){const y=+m[1],mo=+m[2]-1,d=m[4]?+m[4]:(isExpiry?new Date(y,mo+1,0).getDate():1);return new Date(y,mo,d);}
+      m = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/);
+      if(m){return new Date(+m[3],+m[2]-1,+m[1]);}
+      m = str.match(/^(\d{1,2})[-\/](\d{4})$/);
+      if(m){const mo=+m[1]-1,y=+m[2],d=isExpiry?new Date(y,mo+1,0).getDate():1;return new Date(y,mo,d);}
+      const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+      m = str.match(/^([A-Za-z]{3,})[\s\-\/](\d{4})$/);
+      if(m){const mo=months[m[1].slice(0,3).toLowerCase()];if(mo!==undefined){const y=+m[2],d=isExpiry?new Date(y,mo+1,0).getDate():1;return new Date(y,mo,d);}}
+      const n=new Date(str); return isNaN(n)?null:n;
     }
-    html += `</div>`;
-  });
-  c.innerHTML = html;
+    function daysUntil(s){const d=parseFlexibleDate(s,true);if(!d)return null;return Math.floor((d-today)/86400000);}
+    function statusFor(days){
+      if(days===null)return{cls:"",label:"—",pill:"ok"};
+      if(days<0)return{cls:"expired",label:`EXPIRED ${Math.abs(days)}d ago`,pill:"expired"};
+      if(days<30)return{cls:"danger",label:`URGENT ${days}d`,pill:"danger"};
+      if(days<90)return{cls:"warn",label:`${days}d left`,pill:"warn"};
+      return{cls:"",label:`${days}d left`,pill:"ok"};
+    }
+
+    let html = `
+      <button class="back-btn" onclick="renderWeighingProductPicker()">← Products</button>
+      <div style="background:var(--panel);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
+        <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(product.name)}</div>
+      </div>
+
+      <div class="session-banner">
+        <div style="margin-bottom:10px"><b>📋 Weighing Session</b></div>
+        <div class="entry-row">
+          <label>Batch No being produced</label>
+          <input id="wBatch" value="${esc(sessionBatch)}" placeholder="e.g. 26001" style="font-family:monospace;font-weight:700"/>
+        </div>
+        <div class="entry-row" style="margin-bottom:0">
+          <label>Weighed by (your name)</label>
+          <input id="wStaff" value="${esc(sessionStaff)}" placeholder="Your name"/>
+        </div>
+      </div>
+
+      <button class="action-btn green" id="wPrintBOM" style="margin-bottom:14px">🖨️ Print BOM</button>
+    `;
+
+    if(materials.length === 0){
+      html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
+      c.innerHTML = html;
+      c.querySelector("#wPrintBOM").onclick = () => printBOM(productCode);
+      c.querySelector("#wBatch").addEventListener("input", e => sessionBatch = e.target.value);
+      c.querySelector("#wStaff").addEventListener("input", e => sessionStaff = e.target.value);
+      return;
+    }
+
+    let tickedCount = 0;
+    materials.forEach(m=>{
+      m.active.forEach(r=>{
+        const key = m.materialCode + "|" + r.qc + "|" + r.batch;
+        if(ticked[key]) tickedCount++;
+      });
+    });
+
+    html += `
+      <div style="font-size:12px;color:var(--dim);margin-bottom:8px">
+        Materials needed — tap the circle ✓ after you weigh each one.
+        ${tickedCount > 0 ? `<b style="color:var(--green)">${tickedCount} ticked</b>` : ""}
+      </div>
+    `;
+
+    materials.forEach((m, idx)=>{
+      html += `<div style="margin-bottom:14px">
+        <div style="color:var(--dim);font-size:11px;font-family:monospace;margin-bottom:4px">MATERIAL ${idx+1} of ${materials.length}</div>`;
+      if(m.active.length === 0 && m.finishedList.length === 0){
+        html += `<div class="material-card expired"><div class="mat-code">${esc(m.materialCode)}</div>
+          <div class="mat-name">Not in Raw Materials sheet</div></div>`;
+      } else if(m.active.length === 0){
+        html += `<div class="material-card done"><div class="mat-code">${esc(m.materialCode)}</div>
+          <div class="mat-name">✓ All batches finished (${m.finishedList.length})</div>
+          <button class="unmark-btn" onclick="showFinishedBatch('${esc(m.materialCode)}')">Show finished</button></div>`;
+      } else {
+        m.active.forEach(rec=>{
+          const days = daysUntil(rec.exp);
+          const st = statusFor(days);
+          const safeCode = esc(rec.code);
+          const safeQc = esc(rec.qc||"");
+          const safeBatch = esc(rec.batch||"");
+          const key = m.materialCode + "|" + (rec.qc||"") + "|" + (rec.batch||"");
+          const isTicked = !!ticked[key];
+          html += `<div class="material-card ${st.cls} ${isTicked?'ticked':''}">
+            <div class="mat-row">
+              <span class="mat-code">${safeCode}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="alert-pill ${st.pill}">${st.label}</span>
+                <button class="tick-btn ${isTicked?'on':''}" data-tick="${esc(key)}">${isTicked?'✓':''}</button>
+              </div>
+            </div>
+            <div class="mat-name">${esc(rec.name)}</div>
+            <div class="mat-detail">
+              <span class="mat-label">Batch No:</span><span class="mat-value">${safeBatch||"—"}</span>
+              <span class="mat-label">QC No:</span><span class="mat-value">${safeQc||"—"}</span>
+              <span class="mat-label">MFG Date:</span><span class="mat-value">${esc(rec.mfg||"—")}</span>
+              <span class="mat-label">Expiry:</span><span class="mat-value">${esc(rec.exp||"—")}</span>
+            </div>
+            <button class="mark-btn" onclick="confirmMarkFinished('${safeCode}','${safeQc}','${safeBatch}')">Mark material as finished</button>
+          </div>`;
+        });
+      }
+      html += `</div>`;
+    });
+
+    html += `
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <button class="action-btn green" id="wConfirm" style="width:100%">✅ Confirm Weighing Session</button>
+      </div>
+    `;
+
+    c.innerHTML = html;
+
+    c.querySelector("#wBatch").addEventListener("input", e => sessionBatch = e.target.value);
+    c.querySelector("#wStaff").addEventListener("input", e => sessionStaff = e.target.value);
+    c.querySelector("#wPrintBOM").onclick = () => printBOM(productCode);
+
+    c.querySelectorAll("[data-tick]").forEach(btn=>{
+      btn.onclick = () => {
+        const key = btn.getAttribute("data-tick");
+        if(ticked[key]) delete ticked[key]; else ticked[key] = true;
+        renderPage();
+      };
+    });
+
+    c.querySelector("#wConfirm").onclick = async () => {
+      const bn = String(sessionBatch||"").trim();
+      const who = String(sessionStaff||"").trim();
+      if(!bn){ alert("Please enter the batch number being produced."); return; }
+      if(!who){ alert("Please enter your name (Weighed by)."); return; }
+
+      const tickedMaterials = [];
+      materials.forEach(m=>{
+        m.active.forEach(r=>{
+          const key = m.materialCode + "|" + (r.qc||"") + "|" + (r.batch||"");
+          if(ticked[key]){
+            tickedMaterials.push({ code: r.code, qc: r.qc || "", batch: r.batch || "" });
+          }
+        });
+      });
+
+      const compact = tickedMaterials.map(x => `${x.code}/${x.qc}/${x.batch}`).join("; ");
+
+      const row = {
+        "Date": todayString(),
+        "Product": product.name,
+        "Product Code": product.code,
+        "Batch No": bn,
+        "Weighed By": who,
+        "Materials": compact,
+        "Material Count": tickedMaterials.length,
+        "Logged At": new Date().toISOString(),
+      };
+
+      localStorage.setItem("afrab.lastweigher", who);
+
+      const existing = getPending(WEIGHING_STORAGE);
+      savePending(WEIGHING_STORAGE, existing.concat([row]));
+      setStatus("Sending…");
+      const r = await syncPending(WEIGHING_SHEET, WEIGHING_STORAGE);
+      if(r.sent > 0){
+        alert(`✅ Weighing session logged.\n\nBatch ${bn}\n${tickedMaterials.length} material(s)\nWeighed by ${who}`);
+        renderWeighingProductPicker();
+      } else {
+        alert(`⚠️ Saved on phone. It will auto-sync when online.`);
+      }
+    };
+  };
+
+  renderPage();
 }
+
 function confirmMarkFinished(code, qc, batch){
-  const msg = `Mark this batch as finished?\n\nMaterial: ${code}\nQC No: ${qc||"—"}\nBatch: ${batch||"—"}`;
+  const msg = `Mark this material batch as finished?\n\nMaterial: ${code}\nQC No: ${qc||"—"}\nBatch: ${batch||"—"}\n\nIt will be hidden from future weighing sessions.`;
   if(confirm(msg)){
     markFinished(code, qc);
     setStatus("Marked finished");
@@ -959,7 +1097,7 @@ function getPickerSource(source, machineNames, operatorNames){
 }
 
 // ============================================================
-// GENERIC SINGLE-ITEM TEMPLATE ENTRY
+// GENERIC TEMPLATE ENTRY
 // ============================================================
 async function renderTemplate(templateKey){
   const tpl = TEMPLATES[templateKey];
@@ -975,24 +1113,19 @@ async function renderTemplate(templateKey){
       tpl.fields.forEach(f => { row[f.key] = ""; });
       return row;
     };
-
     let entries = [emptyRow()];
     let date = new Date().toISOString().slice(0,10);
 
     const root = document.createElement("div");
     root.innerHTML = `
-      <div class="entry-row">
-        <label>Date</label>
-        <input type="date" id="tplDate" value="${date}"/>
-      </div>
+      <div class="entry-row"><label>Date</label><input type="date" id="tplDate" value="${date}"/></div>
       <div id="tplEntries"></div>
       <button class="action-btn" id="tplAdd" style="width:100%;margin-bottom:12px">+ Add Another Entry</button>
       <button class="action-btn green" id="tplSave" style="width:100%;margin-bottom:16px">💾 Save & Send</button>
       <div id="tplSync"></div>
       <div id="tplPending"></div>
     `;
-    c.innerHTML = "";
-    c.appendChild(root);
+    c.innerHTML = ""; c.appendChild(root);
 
     const entriesBox = root.querySelector("#tplEntries");
     const syncBox    = root.querySelector("#tplSync");
@@ -1000,22 +1133,11 @@ async function renderTemplate(templateKey){
 
     const renderSyncBanner = () => {
       const pending = getPending(tpl.storageKey);
-      if(pending.length === 0){
-        syncBox.innerHTML = `<div class="ok-banner">✅ No pending entries. All sent.</div>`;
-        return;
-      }
-      syncBox.innerHTML = `
-        <div class="info-banner">
-          ${pending.length} pending entr${pending.length===1?"y":"ies"} waiting to sync.
-          <div style="margin-top:10px">
-            <button class="action-btn orange" id="tplSyncNow">🔄 Sync Now</button>
-          </div>
-        </div>`;
+      if(pending.length === 0){ syncBox.innerHTML = `<div class="ok-banner">✅ No pending entries. All sent.</div>`; return; }
+      syncBox.innerHTML = `<div class="info-banner">${pending.length} pending entr${pending.length===1?"y":"ies"} waiting to sync.
+        <div style="margin-top:10px"><button class="action-btn orange" id="tplSyncNow">🔄 Sync Now</button></div></div>`;
       const btn = syncBox.querySelector("#tplSyncNow");
-      if(btn) btn.onclick = async () => {
-        await syncTemplate(tpl);
-        renderSyncBanner(); renderPending();
-      };
+      if(btn) btn.onclick = async () => { await syncTemplate(tpl); renderSyncBanner(); renderPending(); };
     };
 
     const renderEntries = () => {
@@ -1023,33 +1145,17 @@ async function renderTemplate(templateKey){
         const fieldHtml = tpl.fields.map(f => {
           if(f.type === "picker"){
             const picked = e[f.key];
-            return `
-              <div class="entry-row">
-                <label>${esc(f.label)}</label>
-                <button class="picker-btn" data-field="${i}::${f.key}">
-                  ${picked ? esc(picked) : "Tap to choose"}
-                </button>
-              </div>`;
+            return `<div class="entry-row"><label>${esc(f.label)}</label>
+              <button class="picker-btn" data-field="${i}::${f.key}">${picked ? esc(picked) : "Tap to choose"}</button></div>`;
           }
-          return `
-            <div class="entry-row">
-              <label>${esc(f.label)}</label>
-              <input data-field="${i}::${f.key}" type="${f.type === "number" ? "number" : "text"}" ${f.type === "number" ? 'inputmode="numeric"' : ''} value="${esc(e[f.key]||"")}" placeholder="${esc(f.placeholder||"")}"/>
-            </div>`;
+          return `<div class="entry-row"><label>${esc(f.label)}</label>
+            <input data-field="${i}::${f.key}" type="${f.type === "number" ? "number" : "text"}" ${f.type === "number" ? 'inputmode="numeric"' : ''} value="${esc(e[f.key]||"")}" placeholder="${esc(f.placeholder||"")}"/></div>`;
         }).join("");
-        return `
-          <div class="entry-card">
-            <h4>Entry ${i+1}
-              ${entries.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}
-            </h4>
-            <div class="entry-row">
-              <label>Product</label>
-              <button class="picker-btn" data-prod="${i}">
-                ${e.product ? esc(e.product) : "Tap to choose product"}
-              </button>
-            </div>
-            ${fieldHtml}
-          </div>`;
+        return `<div class="entry-card"><h4>Entry ${i+1}
+          ${entries.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}</h4>
+          <div class="entry-row"><label>Product</label>
+            <button class="picker-btn" data-prod="${i}">${e.product ? esc(e.product) : "Tap to choose product"}</button></div>
+          ${fieldHtml}</div>`;
       }).join("");
       bindEntryHandlers();
     };
@@ -1069,12 +1175,9 @@ async function renderTemplate(templateKey){
       });
       entriesBox.querySelectorAll("[data-field]").forEach(el => {
         const tag = el.tagName.toLowerCase();
-        const attr = el.getAttribute("data-field");
-        if(!attr) return;
-        const [iStr, key] = attr.split("::");
-        const i = +iStr;
-        const fieldDef = tpl.fields.find(f => f.key === key);
-        if(!fieldDef) return;
+        const attr = el.getAttribute("data-field"); if(!attr) return;
+        const [iStr, key] = attr.split("::"); const i = +iStr;
+        const fieldDef = tpl.fields.find(f => f.key === key); if(!fieldDef) return;
         if(tag === "button"){
           const source = getPickerSource(fieldDef.source, machineNames, operatorNames);
           el.onclick = async () => {
@@ -1087,10 +1190,8 @@ async function renderTemplate(templateKey){
       });
       entriesBox.querySelectorAll("[data-rm]").forEach(btn => {
         btn.onclick = () => {
-          const i = +btn.getAttribute("data-rm");
-          entries.splice(i, 1);
-          if(entries.length === 0) entries.push(emptyRow());
-          renderEntries();
+          const i = +btn.getAttribute("data-rm"); entries.splice(i, 1);
+          if(entries.length === 0) entries.push(emptyRow()); renderEntries();
         };
       });
     };
@@ -1104,30 +1205,23 @@ async function renderTemplate(templateKey){
           const lines = [];
           Object.keys(p).forEach(k => { if(k === "Saved At") return; lines.push(`<div><b>${esc(k)}:</b> ${esc(p[k])}</div>`); });
           return `<div class="entry-card"><h4>#${i+1} <button class="remove-btn" data-del="${i}">Delete</button></h4><div style="font-size:13px;line-height:1.6">${lines.join("")}</div></div>`;
-        }).join("")}
-      `;
+        }).join("")}`;
       pendingBox.querySelectorAll("[data-del]").forEach(btn => {
         btn.onclick = () => {
-          const i = +btn.getAttribute("data-del");
-          const list = getPending(tpl.storageKey);
-          list.splice(i, 1); savePending(tpl.storageKey, list);
-          renderPending(); renderSyncBanner();
+          const i = +btn.getAttribute("data-del"); const list = getPending(tpl.storageKey);
+          list.splice(i, 1); savePending(tpl.storageKey, list); renderPending(); renderSyncBanner();
         };
       });
     };
 
     root.querySelector("#tplAdd").onclick = () => { entries.push(emptyRow()); renderEntries(); };
-
     root.querySelector("#tplSave").onclick = async () => {
       const d = root.querySelector("#tplDate").value || date;
       const valid = entries.filter(e => {
         if(!e.product) return false;
         return tpl.fields.every(f => String(e[f.key]||"").trim() !== "");
       });
-      if(valid.length === 0){
-        alert("Fill in at least one complete entry.\n\nEvery field is required.");
-        return;
-      }
+      if(valid.length === 0){ alert("Fill in at least one complete entry.\n\nEvery field is required."); return; }
       const toSave = valid.map(e => tpl.toRow(d, e));
       const existing = getPending(tpl.storageKey);
       savePending(tpl.storageKey, existing.concat(toSave));
@@ -1152,41 +1246,27 @@ async function renderTemplate(templateKey){
 }
 
 // ============================================================
-// PRODUCT RECEIPT (multi-item session)
+// PRODUCT RECEIPT
 // ============================================================
 async function renderReceipt(){
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading products…</div>`;
   try{
     const products = await loadProducts();
-
     let date = new Date().toISOString().slice(0,10);
     let reference = makeReference();
     let receivedFrom = "";
     let remarks = "";
-
     const emptyItem = () => ({ product:"", productCode:"", batch_no:"", qty:"" });
     let items = [emptyItem()];
 
     const root = document.createElement("div");
     root.innerHTML = `
       <div class="session-banner" id="sessBanner"></div>
-      <div class="entry-row">
-        <label>Date</label>
-        <input type="date" id="rcDate" value="${date}"/>
-      </div>
-      <div class="entry-row">
-        <label>Reference No</label>
-        <input type="text" id="rcRef" value="${reference}"/>
-      </div>
-      <div class="entry-row">
-        <label>Received From</label>
-        <input type="text" id="rcFrom" placeholder="e.g. Production / Line 2"/>
-      </div>
-      <div class="entry-row">
-        <label>Remarks (optional)</label>
-        <input type="text" id="rcRemarks" placeholder="optional"/>
-      </div>
+      <div class="entry-row"><label>Date</label><input type="date" id="rcDate" value="${date}"/></div>
+      <div class="entry-row"><label>Reference No</label><input type="text" id="rcRef" value="${reference}"/></div>
+      <div class="entry-row"><label>Received From</label><input type="text" id="rcFrom" placeholder="e.g. Production / Line 2"/></div>
+      <div class="entry-row"><label>Remarks (optional)</label><input type="text" id="rcRemarks" placeholder="optional"/></div>
       <hr style="border:0;border-top:1px solid var(--border);margin:16px 0"/>
       <div id="rcItems"></div>
       <button class="action-btn" id="rcAdd" style="width:100%;margin-bottom:12px">+ Add Another Item</button>
@@ -1194,8 +1274,7 @@ async function renderReceipt(){
       <div id="rcSync"></div>
       <div id="rcPending"></div>
     `;
-    c.innerHTML = "";
-    c.appendChild(root);
+    c.innerHTML = ""; c.appendChild(root);
 
     const itemsBox   = root.querySelector("#rcItems");
     const syncBox    = root.querySelector("#rcSync");
@@ -1205,56 +1284,32 @@ async function renderReceipt(){
     const updateSessionBanner = () => {
       sessBanner.innerHTML = `📋 <b>${esc(receivedFrom || "(received from)")}</b> · ${esc(date)} · <span style="font-family:monospace">${esc(reference)}</span>`;
     };
-
     root.querySelector("#rcDate").addEventListener("input", e => { date = e.target.value; updateSessionBanner(); });
     root.querySelector("#rcRef").addEventListener("input",  e => { reference = e.target.value; updateSessionBanner(); });
     root.querySelector("#rcFrom").addEventListener("input", e => { receivedFrom = e.target.value; updateSessionBanner(); });
     root.querySelector("#rcRemarks").addEventListener("input", e => { remarks = e.target.value; });
-
     updateSessionBanner();
 
     const renderSyncBanner = () => {
       const pending = getPending(RECEIPT_STORAGE);
-      if(pending.length === 0){
-        syncBox.innerHTML = `<div class="ok-banner">✅ No pending receipts. All sent.</div>`;
-        return;
-      }
-      syncBox.innerHTML = `
-        <div class="info-banner">
-          ${pending.length} pending item${pending.length===1?"":"s"} waiting to sync.
-          <div style="margin-top:10px">
-            <button class="action-btn orange" id="rcSyncNow">🔄 Sync Now</button>
-          </div>
-        </div>`;
+      if(pending.length === 0){ syncBox.innerHTML = `<div class="ok-banner">✅ No pending receipts. All sent.</div>`; return; }
+      syncBox.innerHTML = `<div class="info-banner">${pending.length} pending item${pending.length===1?"":"s"} waiting to sync.
+        <div style="margin-top:10px"><button class="action-btn orange" id="rcSyncNow">🔄 Sync Now</button></div></div>`;
       const btn = syncBox.querySelector("#rcSyncNow");
-      if(btn) btn.onclick = async () => {
-        await syncPending(RECEIPT_SHEET, RECEIPT_STORAGE);
-        renderSyncBanner(); renderPending();
-      };
+      if(btn) btn.onclick = async () => { await syncPending(RECEIPT_SHEET, RECEIPT_STORAGE); renderSyncBanner(); renderPending(); };
     };
 
     const renderItems = () => {
       itemsBox.innerHTML = items.map((it, i) => `
-        <div class="entry-card">
-          <h4>Item ${i+1}
-            ${items.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}
-          </h4>
-          <div class="entry-row">
-            <label>Product</label>
-            <button class="picker-btn" data-prod="${i}">
-              ${it.product ? esc(it.product) : "Tap to choose product"}
-            </button>
-          </div>
-          <div class="entry-row">
-            <label>Batch No</label>
-            <input data-batch="${i}" value="${esc(it.batch_no)}" placeholder="e.g. B-101"/>
-          </div>
-          <div class="entry-row">
-            <label>Quantity Received</label>
-            <input data-qty="${i}" type="number" inputmode="numeric" value="${esc(it.qty)}" placeholder="e.g. 500"/>
-          </div>
-        </div>
-      `).join("");
+        <div class="entry-card"><h4>Item ${i+1}
+          ${items.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}</h4>
+          <div class="entry-row"><label>Product</label>
+            <button class="picker-btn" data-prod="${i}">${it.product ? esc(it.product) : "Tap to choose product"}</button></div>
+          <div class="entry-row"><label>Batch No</label>
+            <input data-batch="${i}" value="${esc(it.batch_no)}" placeholder="e.g. B-101"/></div>
+          <div class="entry-row"><label>Quantity Received</label>
+            <input data-qty="${i}" type="number" inputmode="numeric" value="${esc(it.qty)}" placeholder="e.g. 500"/></div>
+        </div>`).join("");
       bindItemHandlers();
     };
 
@@ -1280,9 +1335,7 @@ async function renderReceipt(){
       itemsBox.querySelectorAll("[data-rm]").forEach(btn => {
         btn.onclick = () => {
           const i = +btn.getAttribute("data-rm");
-          items.splice(i, 1);
-          if(items.length === 0) items.push(emptyItem());
-          renderItems();
+          items.splice(i, 1); if(items.length === 0) items.push(emptyItem()); renderItems();
         };
       });
     };
@@ -1296,43 +1349,29 @@ async function renderReceipt(){
           const lines = [];
           Object.keys(p).forEach(k => { if(k === "Saved At") return; lines.push(`<div><b>${esc(k)}:</b> ${esc(p[k])}</div>`); });
           return `<div class="entry-card"><h4>#${i+1} <button class="remove-btn" data-del="${i}">Delete</button></h4><div style="font-size:13px;line-height:1.6">${lines.join("")}</div></div>`;
-        }).join("")}
-      `;
+        }).join("")}`;
       pendingBox.querySelectorAll("[data-del]").forEach(btn => {
         btn.onclick = () => {
-          const i = +btn.getAttribute("data-del");
-          const list = getPending(RECEIPT_STORAGE);
-          list.splice(i, 1); savePending(RECEIPT_STORAGE, list);
-          renderPending(); renderSyncBanner();
+          const i = +btn.getAttribute("data-del"); const list = getPending(RECEIPT_STORAGE);
+          list.splice(i, 1); savePending(RECEIPT_STORAGE, list); renderPending(); renderSyncBanner();
         };
       });
     };
 
     root.querySelector("#rcAdd").onclick = () => { items.push(emptyItem()); renderItems(); };
-
     root.querySelector("#rcSave").onclick = async () => {
       if(!receivedFrom.trim()){ alert("Please enter who received the items from."); return; }
       const valid = items.filter(it => it.product && it.batch_no && it.qty);
-      if(valid.length === 0){
-        alert("Fill in at least one complete item.\n\nEach item needs Product, Batch No, and Quantity.");
-        return;
-      }
+      if(valid.length === 0){ alert("Fill in at least one complete item.\n\nEach item needs Product, Batch No, and Quantity."); return; }
       const ref = reference.trim() || makeReference();
       const toSave = valid.map(it => ({
-        "Date": date,
-        "Reference No": ref,
-        "Product": it.product,
-        "Product Code": it.productCode,
-        "Batch No": it.batch_no,
-        "Quantity": it.qty,
-        "Received From": receivedFrom,
-        "Remarks": remarks,
-        "Saved At": new Date().toISOString(),
+        "Date": date, "Reference No": ref, "Product": it.product, "Product Code": it.productCode,
+        "Batch No": it.batch_no, "Quantity": it.qty, "Received From": receivedFrom,
+        "Remarks": remarks, "Saved At": new Date().toISOString(),
       }));
       const existing = getPending(RECEIPT_STORAGE);
       savePending(RECEIPT_STORAGE, existing.concat(toSave));
-      items = [emptyItem()];
-      reference = makeReference();
+      items = [emptyItem()]; reference = makeReference();
       root.querySelector("#rcRef").value = reference;
       renderItems(); renderPending(); renderSyncBanner(); updateSessionBanner();
       setStatus("Sending…");
@@ -1354,29 +1393,25 @@ async function renderReceipt(){
 }
 
 // ============================================================
-// PRODUCTION BATCH TRACKER (auto batch numbers, unsharded registry)
+// BATCH TRACKER (FIXED — declaration order)
 // ============================================================
 async function renderBatch(){
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading products & batch registry…</div>`;
   try{
-    const [products, registry] = await Promise.all([loadProducts(), fetchSheet(BATCH_REGISTRY_SHEET)]);
+    const [products, registry] = await Promise.all([loadProducts(), safeFetch(BATCH_REGISTRY_SHEET)]);
 
     let date = new Date().toISOString().slice(0,10);
+    let entries = [];
+    function entriesToRegistryRow(e){ return { "Batch No": e.batch_no }; }
     const emptyRow = () => {
       const bn = nextBatchNumber([...(registry || []), ...entries.map(entriesToRegistryRow)]);
       return { product:"", productCode:"", batch_no: bn, batch_size:"", notes:"" };
     };
-    // helper used by emptyRow to consider unsaved rows too
-    function entriesToRegistryRow(e){
-      return { "Batch No": e.batch_no };
-    }
-
-    let entries = [emptyRow()];
+    entries = [emptyRow()];
 
     const yearInfo = () => {
-      const y = new Date().getFullYear();
-      const prefix = yearPrefix();
+      const y = new Date().getFullYear(); const prefix = yearPrefix();
       let maxSeq = 0;
       [...(registry || []), ...entries.filter(x=>x.batch_no)].forEach(row => {
         const bn = String(row["Batch No"] || "").trim();
@@ -1391,18 +1426,14 @@ async function renderBatch(){
     const root = document.createElement("div");
     root.innerHTML = `
       <div class="session-banner" id="btInfo"></div>
-      <div class="entry-row">
-        <label>Date</label>
-        <input type="date" id="btDate" value="${date}"/>
-      </div>
+      <div class="entry-row"><label>Date</label><input type="date" id="btDate" value="${date}"/></div>
       <div id="btEntries"></div>
       <button class="action-btn purple" id="btAdd" style="width:100%;margin-bottom:12px">+ Add Another Batch</button>
       <button class="action-btn green" id="btSave" style="width:100%;margin-bottom:16px">💾 Save All Batches</button>
       <div id="btSync"></div>
       <div id="btPending"></div>
     `;
-    c.innerHTML = "";
-    c.appendChild(root);
+    c.innerHTML = ""; c.appendChild(root);
 
     const entriesBox = root.querySelector("#btEntries");
     const syncBox    = root.querySelector("#btSync");
@@ -1414,57 +1445,33 @@ async function renderBatch(){
       const total = (registry || []).length;
       const yearTotal = (registry || []).filter(r => String(r["Batch No"] || "").startsWith(yearPrefix())).length;
       const next = yearInfo().next;
-      infoBox.innerHTML = `📅 <b>Year ${y}</b> · Next batch number: <span class="batch-pill">${esc(next)}</span> · This year: ${yearTotal} · Total ever: ${total}`;
+      infoBox.innerHTML = `📅 <b>Year ${y}</b> · Next: <span class="batch-pill">${esc(next)}</span> · This year: ${yearTotal} · Total ever: ${total}`;
     };
     root.querySelector("#btDate").addEventListener("input", e => { date = e.target.value; });
     updateInfo();
 
     const renderSyncBanner = () => {
       const pending = getPending(BATCH_STORAGE);
-      if(pending.length === 0){
-        syncBox.innerHTML = `<div class="ok-banner">✅ No pending batches. All saved.</div>`;
-        return;
-      }
-      syncBox.innerHTML = `
-        <div class="info-banner">
-          ${pending.length} pending batch${pending.length===1?"":"es"} waiting to sync.
-          <div style="margin-top:10px">
-            <button class="action-btn orange" id="btSyncNow">🔄 Sync Now</button>
-          </div>
-        </div>`;
+      if(pending.length === 0){ syncBox.innerHTML = `<div class="ok-banner">✅ No pending batches. All saved.</div>`; return; }
+      syncBox.innerHTML = `<div class="info-banner">${pending.length} pending batch${pending.length===1?"":"es"} waiting to sync.
+        <div style="margin-top:10px"><button class="action-btn orange" id="btSyncNow">🔄 Sync Now</button></div></div>`;
       const btn = syncBox.querySelector("#btSyncNow");
-      if(btn) btn.onclick = async () => {
-        await syncPending(BATCH_REGISTRY_SHEET, BATCH_STORAGE);
-        renderSyncBanner(); renderPending();
-      };
+      if(btn) btn.onclick = async () => { await syncPending(BATCH_REGISTRY_SHEET, BATCH_STORAGE); renderSyncBanner(); renderPending(); };
     };
 
     const renderEntries = () => {
       entriesBox.innerHTML = entries.map((e, i) => `
-        <div class="entry-card">
-          <h4>Batch ${i+1}
-            ${entries.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}
-          </h4>
-          <div class="entry-row">
-            <label>Product</label>
-            <button class="picker-btn" data-prod="${i}">
-              ${e.product ? esc(e.product) : "Tap to choose product"}
-            </button>
-          </div>
-          <div class="entry-row">
-            <label>Batch No (auto-suggested — editable)</label>
-            <input data-bn="${i}" value="${esc(e.batch_no)}" placeholder="e.g. 26001" style="font-family:monospace;font-weight:700"/>
-          </div>
-          <div class="entry-row">
-            <label>Batch Size</label>
-            <input data-bs="${i}" type="number" inputmode="numeric" value="${esc(e.batch_size)}" placeholder="e.g. 5000"/>
-          </div>
-          <div class="entry-row">
-            <label>Notes (optional)</label>
-            <input data-notes="${i}" value="${esc(e.notes||"")}" placeholder="optional"/>
-          </div>
-        </div>
-      `).join("");
+        <div class="entry-card"><h4>Batch ${i+1}
+          ${entries.length > 1 ? `<button class="remove-btn" data-rm="${i}">Remove</button>` : ""}</h4>
+          <div class="entry-row"><label>Product</label>
+            <button class="picker-btn" data-prod="${i}">${e.product ? esc(e.product) : "Tap to choose product"}</button></div>
+          <div class="entry-row"><label>Batch No (auto-suggested — editable)</label>
+            <input data-bn="${i}" value="${esc(e.batch_no)}" placeholder="e.g. 26001" style="font-family:monospace;font-weight:700"/></div>
+          <div class="entry-row"><label>Batch Size</label>
+            <input data-bs="${i}" type="number" inputmode="numeric" value="${esc(e.batch_size)}" placeholder="e.g. 5000"/></div>
+          <div class="entry-row"><label>Notes (optional)</label>
+            <input data-notes="${i}" value="${esc(e.notes||"")}" placeholder="optional"/></div>
+        </div>`).join("");
       bindEntryHandlers();
       updateInfo();
     };
@@ -1494,9 +1501,7 @@ async function renderBatch(){
       entriesBox.querySelectorAll("[data-rm]").forEach(btn => {
         btn.onclick = () => {
           const i = +btn.getAttribute("data-rm");
-          entries.splice(i, 1);
-          if(entries.length === 0) entries.push(emptyRow());
-          renderEntries();
+          entries.splice(i, 1); if(entries.length === 0) entries.push(emptyRow()); renderEntries();
         };
       });
     };
@@ -1510,20 +1515,16 @@ async function renderBatch(){
           const lines = [];
           Object.keys(p).forEach(k => { if(k === "Created At") return; lines.push(`<div><b>${esc(k)}:</b> ${esc(p[k])}</div>`); });
           return `<div class="entry-card"><h4>#${i+1} <button class="remove-btn" data-del="${i}">Delete</button></h4><div style="font-size:13px;line-height:1.6">${lines.join("")}</div></div>`;
-        }).join("")}
-      `;
+        }).join("")}`;
       pendingBox.querySelectorAll("[data-del]").forEach(btn => {
         btn.onclick = () => {
-          const i = +btn.getAttribute("data-del");
-          const list = getPending(BATCH_STORAGE);
-          list.splice(i, 1); savePending(BATCH_STORAGE, list);
-          renderPending(); renderSyncBanner();
+          const i = +btn.getAttribute("data-del"); const list = getPending(BATCH_STORAGE);
+          list.splice(i, 1); savePending(BATCH_STORAGE, list); renderPending(); renderSyncBanner();
         };
       });
     };
 
     root.querySelector("#btAdd").onclick = () => {
-      // Suggest the next number after everything currently visible
       const prefix = yearPrefix();
       let maxSeq = 0;
       [...(registry || []), ...entries].forEach(row => {
@@ -1541,11 +1542,7 @@ async function renderBatch(){
     root.querySelector("#btSave").onclick = async () => {
       const d = root.querySelector("#btDate").value || date;
       const valid = entries.filter(e => e.product && e.batch_no && e.batch_size);
-      if(valid.length === 0){
-        alert("Fill in at least one complete batch.\n\nRequired: Product, Batch No, Batch Size.");
-        return;
-      }
-      // Check for duplicate batch numbers within this submission or against registry
+      if(valid.length === 0){ alert("Fill in at least one complete batch.\n\nRequired: Product, Batch No, Batch Size."); return; }
       const registryNumbers = new Set((registry || []).map(r => String(r["Batch No"]||"").trim()));
       const seen = new Set();
       for(const e of valid){
@@ -1554,22 +1551,14 @@ async function renderBatch(){
         if(seen.has(bn)){ alert(`Batch No "${bn}" is used twice in this submission.`); return; }
         seen.add(bn);
       }
-
       const toSave = valid.map(e => ({
-        "Date": d,
-        "Product": e.product,
-        "Product Code": e.productCode,
-        "Batch No": e.batch_no,
-        "Batch Size": e.batch_size,
-        "Notes": e.notes || "",
-        "Created At": new Date().toISOString(),
+        "Date": d, "Product": e.product, "Product Code": e.productCode,
+        "Batch No": e.batch_no, "Batch Size": e.batch_size,
+        "Notes": e.notes || "", "Created At": new Date().toISOString(),
       }));
       const existing = getPending(BATCH_STORAGE);
       savePending(BATCH_STORAGE, existing.concat(toSave));
-
-      // Optimistically add to in-memory registry so next suggestion is correct
       toSave.forEach(r => registry.push(r));
-
       entries = [emptyRow()];
       renderEntries(); renderPending(); renderSyncBanner(); updateInfo();
       setStatus("Sending…");
@@ -1586,6 +1575,177 @@ async function renderBatch(){
     setStatus("Production Batch ready");
   } catch(err){
     c.innerHTML = `<div class="err-banner">Failed to load: ${err.message}</div>
+      <button class="back-btn" onclick="goHome()">← Back</button>`;
+  }
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+async function renderDashboard(){
+  const c = document.getElementById("module-content");
+  c.innerHTML = `<div class="loading">Building dashboard — reading this month's logs…</div>`;
+
+  try{
+    const month = currentMonthString();
+    const today = todayString();
+    const startOfWeek = (() => {
+      const d = new Date();
+      const dow = d.getDay() || 7;
+      d.setDate(d.getDate() - (dow - 1));
+      return d.toISOString().slice(0,10);
+    })();
+
+    const [packing, filling, shrink, coding, receipt, weighing] = await Promise.all([
+      safeFetch("packing_log_" + month),
+      safeFetch("filling_log_" + month),
+      safeFetch("shrinkwrap_log_" + month),
+      safeFetch("coding_log_" + month),
+      safeFetch("receipt_log_" + month),
+      safeFetch("weighing_log_" + month),
+    ]);
+
+    const inRange = (row, from, to) => {
+      const d = parseYMD(row["Date"] || row["Saved At"] || row["Logged At"]);
+      if(!d) return false;
+      const s = d.toISOString().slice(0,10);
+      return s >= from && s <= to;
+    };
+    const num = v => { const n = parseInt(String(v||"").replace(/[^\d-]/g,""), 10); return isNaN(n)?0:n; };
+
+    const todayPacking = packing.filter(r => inRange(r, today, today));
+    const todayFilling = filling.filter(r => inRange(r, today, today));
+    const todayShrink  = shrink.filter(r => inRange(r, today, today));
+    const todayCoding  = coding.filter(r => inRange(r, today, today));
+    const todayReceipt = receipt.filter(r => inRange(r, today, today));
+    const todayWeigh   = weighing.filter(r => inRange(r, today, today));
+
+    const todayOutput = todayPacking.reduce((s,r) => s + num(r["Output"]), 0)
+                      + todayFilling.reduce((s,r) => s + num(r["Daily Output"]), 0);
+    const todayDowntimeHrs = todayFilling.reduce((s,r) => s + downtimeToHours(r["Machine Downtime"]), 0);
+    const todayEntries = todayPacking.length + todayFilling.length + todayShrink.length
+                       + todayCoding.length + todayReceipt.length + todayWeigh.length;
+
+    const lineStats = {};
+    todayFilling.forEach(r => {
+      const line = String(r["Filling Line"]||"(unset)").trim();
+      lineStats[line] = (lineStats[line] || 0) + num(r["Daily Output"]);
+    });
+    const codingStats = {};
+    todayCoding.forEach(r => {
+      const m = String(r["Machine"]||"(unset)").trim();
+      codingStats[m] = (codingStats[m] || 0) + num(r["Quantity"]);
+    });
+    const shrinkStats = {};
+    todayShrink.forEach(r => {
+      const m = String(r["Machine"]||"(unset)").trim();
+      shrinkStats[m] = (shrinkStats[m] || 0) + num(r["Quantity"]);
+    });
+
+    const weekPacking = packing.filter(r => inRange(r, startOfWeek, today));
+    const weekFilling = filling.filter(r => inRange(r, startOfWeek, today));
+    const weekOutput = weekPacking.reduce((s,r) => s + num(r["Output"]), 0)
+                     + weekFilling.reduce((s,r) => s + num(r["Daily Output"]), 0);
+    const weekEntries = packing.filter(r => inRange(r, startOfWeek, today)).length
+                      + filling.filter(r => inRange(r, startOfWeek, today)).length
+                      + shrink.filter(r => inRange(r, startOfWeek, today)).length
+                      + coding.filter(r => inRange(r, startOfWeek, today)).length
+                      + receipt.filter(r => inRange(r, startOfWeek, today)).length;
+
+    const monthOutput = packing.reduce((s,r) => s + num(r["Output"]), 0)
+                      + filling.reduce((s,r) => s + num(r["Daily Output"]), 0);
+    const monthEntries = packing.length + filling.length + shrink.length
+                       + coding.length + receipt.length + weighing.length;
+
+    const pendingShrink = getPending("afrab.shrink.pending").length;
+    const pendingCoding = getPending("afrab.coding.pending").length;
+    const pendingPacking = getPending("afrab.packing.pending").length;
+    const pendingFilling = getPending("afrab.filling.pending").length;
+    const pendingReceipt = getPending(RECEIPT_STORAGE).length;
+    const pendingBatch = getPending(BATCH_STORAGE).length;
+    const pendingWeighing = getPending(WEIGHING_STORAGE).length;
+    const pendingTotal = pendingShrink + pendingCoding + pendingPacking + pendingFilling
+                       + pendingReceipt + pendingBatch + pendingWeighing;
+
+    const listHtml = (obj) => {
+      const keys = Object.keys(obj);
+      if(!keys.length) return `<div class="list-row"><span class="name">No entries yet today</span></div>`;
+      return keys.sort().map(k => `
+        <div class="list-row">
+          <span class="name">${esc(k)}</span>
+          <span class="num">${obj[k].toLocaleString()}</span>
+        </div>`).join("");
+    };
+
+    c.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div><div style="font-size:12px;color:var(--dim)">As of ${new Date().toLocaleString()}</div></div>
+        <button class="action-btn alt" onclick="renderDashboard()" style="margin:0">🔄 Refresh</button>
+      </div>
+
+      <h2>📅 Today · ${esc(today)}</h2>
+      <div class="stat-grid">
+        <div class="stat-card accent">
+          <div class="stat-label">Total Entries</div>
+          <div class="stat-value">${todayEntries}</div>
+          <div class="stat-sub">across all modules</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Total Output</div>
+          <div class="stat-value">${todayOutput.toLocaleString()}</div>
+          <div class="stat-sub">packing + filling units</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">Downtime</div>
+          <div class="stat-value">${todayDowntimeHrs.toFixed(2)} h</div>
+          <div class="stat-sub">filling lines</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Weighing Sessions</div>
+          <div class="stat-value">${todayWeigh.length}</div>
+          <div class="stat-sub">batches weighed</div>
+        </div>
+      </div>
+
+      <h2>🏭 Filling Lines Today</h2>
+      <div class="list-card">${listHtml(lineStats)}</div>
+
+      <h2>🏷️ Coding — Per Machine Today</h2>
+      <div class="list-card">${listHtml(codingStats)}</div>
+
+      <h2>🎞️ Shrinkwrap — Per Machine Today</h2>
+      <div class="list-card">${listHtml(shrinkStats)}</div>
+
+      <h2>📆 This Week · from ${esc(startOfWeek)}</h2>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value">${weekEntries}</div></div>
+        <div class="stat-card"><div class="stat-label">Output</div><div class="stat-value">${weekOutput.toLocaleString()}</div></div>
+      </div>
+
+      <h2>🗓️ This Month · ${esc(month)}</h2>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value">${monthEntries}</div></div>
+        <div class="stat-card"><div class="stat-label">Output</div><div class="stat-value">${monthOutput.toLocaleString()}</div></div>
+      </div>
+
+      <h2>⏳ Pending Sync</h2>
+      <div class="list-card">
+        ${pendingTotal === 0
+          ? `<div class="list-row"><span class="name" style="color:var(--green)">✅ All entries synced to Google Sheet</span></div>`
+          : `
+            ${pendingPacking ? `<div class="list-row"><span class="name">Packing</span><span class="num">${pendingPacking}</span></div>` : ""}
+            ${pendingFilling ? `<div class="list-row"><span class="name">Filling</span><span class="num">${pendingFilling}</span></div>` : ""}
+            ${pendingShrink ? `<div class="list-row"><span class="name">Shrinkwrap</span><span class="num">${pendingShrink}</span></div>` : ""}
+            ${pendingCoding ? `<div class="list-row"><span class="name">Coding</span><span class="num">${pendingCoding}</span></div>` : ""}
+            ${pendingReceipt ? `<div class="list-row"><span class="name">Product Receipt</span><span class="num">${pendingReceipt}</span></div>` : ""}
+            ${pendingBatch ? `<div class="list-row"><span class="name">Production Batch</span><span class="num">${pendingBatch}</span></div>` : ""}
+            ${pendingWeighing ? `<div class="list-row"><span class="name">Weighing</span><span class="num">${pendingWeighing}</span></div>` : ""}
+          `}
+      </div>
+    `;
+    setStatus("Dashboard loaded");
+  } catch(err){
+    c.innerHTML = `<div class="err-banner">Dashboard failed: ${err.message}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
