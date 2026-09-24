@@ -163,8 +163,19 @@ const SHEETS = {
 };
 
 // ============================================================
-// MODULE TEMPLATES — each module defines its own fields
-// and its own mapping to the Google Sheet columns
+// FILLING LINES (static list — you can later add a filling_lines tab)
+// ============================================================
+const FILLING_LINES = [
+  "100ml line (FL 2)",
+  "15ml drops line (FL1)",
+  "Ibuprofen Line (FL3)",
+  "Manual Line",
+  "External",
+  "Antibiotics",
+];
+
+// ============================================================
+// MODULE TEMPLATES
 // ============================================================
 const TEMPLATES = {
   shrinkwrap: {
@@ -187,10 +198,6 @@ const TEMPLATES = {
       "Quantity": e.qty,
       "Saved At": new Date().toISOString(),
     }),
-    pendingSummary: (e) => [
-      ["Product", e.product], ["Batch No", e.batch_no],
-      ["Machine", e.machine], ["Operator", e.operator], ["Quantity", e.qty]
-    ],
   },
   coding: {
     title: "Coding",
@@ -212,10 +219,6 @@ const TEMPLATES = {
       "Quantity": e.qty,
       "Saved At": new Date().toISOString(),
     }),
-    pendingSummary: (e) => [
-      ["Product", e.product], ["Batch No", e.batch_no],
-      ["Machine", e.machine], ["Operator", e.operator], ["Quantity", e.qty]
-    ],
   },
   packing: {
     title: "Packing",
@@ -237,10 +240,31 @@ const TEMPLATES = {
       "Output": e.output,
       "Saved At": new Date().toISOString(),
     }),
-    pendingSummary: (e) => [
-      ["Product", e.product], ["Batch No", e.batch_no],
-      ["Batch Size", e.batch_size], ["No of Packers", e.packers], ["Output", e.output]
+  },
+  filling: {
+    title: "Filling",
+    sheetName: "filling_log",
+    storageKey: "afrab.filling.pending",
+    fields: [
+      { key:"batch_no",        label:"Batch No",            type:"text",   placeholder:"e.g. 26001" },
+      { key:"filling_line",    label:"Filling Line",        type:"picker", source:"filling_lines", allowCustom:false },
+      { key:"no_personnel",    label:"No of Personnel",     type:"number", placeholder:"e.g. 8" },
+      { key:"output",          label:"Daily Output",        type:"number", placeholder:"e.g. 4500" },
+      { key:"downtime",        label:"Machine Downtime",    type:"text",   placeholder:"HH:MM:SS  e.g. 1:55:15" },
+      { key:"downtime_reason", label:"Downtime Reason",     type:"text",   placeholder:"e.g. None / Maintenance" },
     ],
+    toRow: (date, e) => ({
+      "Date": date,
+      "Product": e.product,
+      "Product Code": e.productCode,
+      "Batch No": e.batch_no,
+      "Filling Line": e.filling_line,
+      "No of Personnel": e.no_personnel,
+      "Daily Output": e.output,
+      "Machine Downtime": e.downtime,
+      "Downtime Reason": e.downtime_reason,
+      "Saved At": new Date().toISOString(),
+    }),
   },
 };
 
@@ -375,6 +399,7 @@ function openModule(id){
   else if(id==="shrink") renderTemplate("shrinkwrap");
   else if(id==="coding") renderTemplate("coding");
   else if(id==="packing") renderTemplate("packing");
+  else if(id==="filling") renderTemplate("filling");
   else c.innerHTML=`<div class="empty"><b>${MODULES[id].title}</b> — coming next.</div>`;
 }
 
@@ -640,7 +665,7 @@ function refreshAllData(){
 }
 
 // ============================================================
-// COMPANY SETTINGS + DEBUG
+// COMPANY SETTINGS
 // ============================================================
 function renderCompanySettings(){
   document.getElementById("module-title").textContent="Company Info";
@@ -658,30 +683,8 @@ function renderCompanySettings(){
     <input class="field" id="co-email" value="${esc(co.email)}"/>
     <button class="action-btn green" onclick="saveCompanyInfo()">Save</button>
     <button class="action-btn alt" onclick="goHome()">Cancel</button>
-    <hr style="border:0;border-top:1px solid var(--border);margin:20px 0"/>
-    <div style="font-size:12px;color:var(--dim);margin-bottom:8px">Debug tools:</div>
-    <button class="action-btn orange" onclick="testWrite()">🔬 Test Write to Sheet</button>
-    <div id="test-out" style="font-family:monospace;font-size:11px;color:var(--dim);margin-top:10px;white-space:pre-wrap;line-height:1.6"></div>
   `;
   showScreen("screen-module");
-}
-async function testWrite(){
-  const out = document.getElementById("test-out");
-  out.textContent = "Opening a small tab with the test URL…\nExpecting tab: test_conn\n\n";
-  try {
-    const url = buildWriteUrl("test_conn", [{When: new Date().toISOString(), Test: "1"}]);
-    const w = window.open(url, "_blank", "width=80,height=80,left=-1000,top=-1000");
-    out.textContent += "window.open returned: " + (w ? "an object (success)" : "null (blocked!)");
-    if(w && !w.closed){
-      await new Promise(r => setTimeout(r, 2500));
-      try { w.close(); } catch(e){}
-      out.textContent += "\n\nIf a tab flashed briefly — check your sheet for tab 'test_conn'.";
-    } else {
-      out.textContent += "\n\nPopup was BLOCKED. Enable pop-ups for this site.";
-    }
-  } catch(e){
-    out.textContent += "\n\nError: " + e.message;
-  }
 }
 function saveCompanyInfo(){
   saveCompany({
@@ -705,7 +708,6 @@ async function renderWeighingProductPicker(){
     c.innerHTML=`
       <div class="info-banner">
         ${productsWithBOM.size} of ${products.length} products have a BOM.
-        <div style="margin-top:8px"><button class="action-btn alt" onclick="refreshAllData();renderWeighingProductPicker()" style="margin:0;font-size:12px">🔄 Refresh</button></div>
       </div>
       <input class="search" id="w-search" placeholder="Search product…"/>
       <div id="w-list"></div>`;
@@ -934,19 +936,26 @@ function openPicker(title, items, allowCustom){
   });
 }
 
+// Helper — get the picker source list for a template field
+function getPickerSource(source, machineNames, operatorNames){
+  if(source === "machines") return machineNames;
+  if(source === "operators") return operatorNames;
+  if(source === "filling_lines") return FILLING_LINES;
+  return [];
+}
+
 // ============================================================
-// GENERIC BATCH ENTRY (driven by a template)
+// GENERIC BATCH ENTRY (template-driven)
 // ============================================================
 async function renderTemplate(templateKey){
   const tpl = TEMPLATES[templateKey];
   const c = document.getElementById("module-content");
-  c.innerHTML = `<div class="loading">Loading products, machines, operators…</div>`;
+  c.innerHTML = `<div class="loading">Loading…</div>`;
   try{
     const [products, machines, operators] = await Promise.all([loadProducts(), loadMachines(), loadOperators()]);
     const machineNames  = machines.map(m => m.name || m);
     const operatorNames = operators.map(o => o.name || o);
 
-    // Empty row — one object per entry with all the field keys
     const emptyRow = () => {
       const row = { product:"", productCode:"" };
       tpl.fields.forEach(f => { row[f.key] = ""; });
@@ -975,7 +984,6 @@ async function renderTemplate(templateKey){
     const syncBox    = root.querySelector("#tplSync");
     const pendingBox = root.querySelector("#tplPending");
 
-    // -------- Sync banner --------
     const renderSyncBanner = () => {
       const pending = getPending(tpl.storageKey);
       if(pending.length === 0){
@@ -998,13 +1006,11 @@ async function renderTemplate(templateKey){
       };
     };
 
-    // -------- Entry list --------
     const renderEntries = () => {
       entriesBox.innerHTML = entries.map((e, i) => {
         const fieldHtml = tpl.fields.map(f => {
           if(f.type === "picker"){
             const picked = e[f.key];
-            const source = f.source === "machines" ? machineNames : operatorNames;
             return `
               <div class="entry-row">
                 <label>${esc(f.label)}</label>
@@ -1038,7 +1044,6 @@ async function renderTemplate(templateKey){
     };
 
     const bindEntryHandlers = () => {
-      // Product pickers
       entriesBox.querySelectorAll("[data-prod]").forEach(btn => {
         btn.onclick = async () => {
           const i = +btn.getAttribute("data-prod");
@@ -1051,26 +1056,24 @@ async function renderTemplate(templateKey){
           }
         };
       });
-      // Other pickers (machine/operator)
       entriesBox.querySelectorAll("[data-field]").forEach(el => {
         const tag = el.tagName.toLowerCase();
         const attr = el.getAttribute("data-field");
-        if(attr && tag === "button"){
-          const [iStr, key] = attr.split("::");
-          const i = +iStr;
-          const fieldDef = tpl.fields.find(f => f.key === key);
-          const source = fieldDef.source === "machines" ? machineNames : operatorNames;
+        if(!attr) return;
+        const [iStr, key] = attr.split("::");
+        const i = +iStr;
+        const fieldDef = tpl.fields.find(f => f.key === key);
+        if(!fieldDef) return;
+        if(tag === "button"){
+          const source = getPickerSource(fieldDef.source, machineNames, operatorNames);
           el.onclick = async () => {
-            const picked = await openPicker("Choose " + fieldDef.label, source, true);
+            const picked = await openPicker("Choose " + fieldDef.label, source, !!fieldDef.allowCustom);
             if(picked){ entries[i][key] = picked; renderEntries(); }
           };
-        } else if(attr && tag === "input"){
-          const [iStr, key] = attr.split("::");
-          const i = +iStr;
-          el.oninput = e => { entries[i][key] = e.target.value; };
+        } else if(tag === "input"){
+          el.oninput = ev => { entries[i][key] = ev.target.value; };
         }
       });
-      // Remove buttons
       entriesBox.querySelectorAll("[data-rm]").forEach(btn => {
         btn.onclick = () => {
           const i = +btn.getAttribute("data-rm");
@@ -1081,20 +1084,15 @@ async function renderTemplate(templateKey){
       });
     };
 
-    // -------- Pending list --------
     const renderPending = () => {
       const pending = getPending(tpl.storageKey);
       if(pending.length === 0){ pendingBox.innerHTML = ""; return; }
       pendingBox.innerHTML = `
         <div style="color:var(--dim);font-size:12px;margin-top:16px;margin-bottom:8px">Pending entries on this phone:</div>
         ${pending.map((p, i) => {
-          const lines = [
-            `<div><b>Date:</b> ${esc(p.Date || "")}</div>`,
-            `<div><b>Product:</b> ${esc(p.Product || "")}</div>`,
-          ];
-          // Add all other columns except internal ones
+          const lines = [];
           Object.keys(p).forEach(k => {
-            if(["Date","Product","Product Code","Saved At"].includes(k)) return;
+            if(k === "Saved At") return;
             lines.push(`<div><b>${esc(k)}:</b> ${esc(p[k])}</div>`);
           });
           return `
