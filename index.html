@@ -343,49 +343,54 @@ function fetchSheet(sheetName){
 }
 
 // ============================================================
-// WRITE VIA IFRAME — bypasses CORS completely
+// WRITE VIA NEW-TAB NAVIGATION
+// Opens the Apps Script URL in a tiny hidden tab, then closes it.
+// Top-level navigation is never blocked by CORS.
 // ============================================================
-async function postRows(sheetName, rows){
-  if(!rows || !rows.length) return false;
-  try {
-    const url = API_BASE
-      + "?action=append"
-      + "&sheet=" + encodeURIComponent(sheetName)
-      + "&rows=" + encodeURIComponent(JSON.stringify(rows));
-    return await new Promise((resolve) => {
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "absolute";
-      iframe.style.width = "1px";
-      iframe.style.height = "1px";
-      iframe.style.border = "0";
-      iframe.style.opacity = "0";
-      iframe.style.pointerEvents = "none";
-      iframe.src = url;
-      let settled = false;
-      const done = (ok) => { if(settled) return; settled = true; resolve(ok); };
-      iframe.onload = () => done(true);
-      iframe.onerror = () => done(false);
-      document.body.appendChild(iframe);
-      setTimeout(() => done(true), 4000);
-      setTimeout(() => { try { iframe.remove(); } catch(e){} }, 8000);
-    });
-  } catch(e) {
-    return false;
-  }
+function buildWriteUrl(sheetName, rows){
+  return API_BASE
+    + "?action=append"
+    + "&sheet=" + encodeURIComponent(sheetName)
+    + "&rows=" + encodeURIComponent(JSON.stringify(rows));
 }
 
-// Generic sync
+async function postRows(sheetName, rows){
+  if(!rows || !rows.length) return false;
+  const url = buildWriteUrl(sheetName, rows);
+
+  // Strategy 1: window.open in a tiny off-screen tab, then close it
+  try {
+    const w = window.open(url, "_blank", "width=80,height=80,left=-1000,top=-1000");
+    if(w && !w.closed){
+      // Give Apps Script time to process
+      await new Promise(r => setTimeout(r, 2500));
+      try { w.close(); } catch(e){}
+      return true;
+    }
+  } catch(e) { /* fall through */ }
+
+  // Strategy 2: fetch with redirect manual (silent fallback)
+  try {
+    await fetch(url, {method: "GET", mode: "no-cors", redirect: "manual", cache: "no-store"});
+    await new Promise(r => setTimeout(r, 1500));
+    return true;
+  } catch(e) { /* fall through */ }
+
+  return false;
+}
+
+// Sync a queue
 async function syncPending(storageGet, storageSave, sheetName){
   const pending = storageGet();
   if(!pending.length) return {sent: 0, remaining: 0};
-  setStatus(`Syncing ${pending.length}…`);
+  setStatus(`Sending ${pending.length}…`);
   const ok = await postRows(sheetName, pending);
   if(ok){
     storageSave([]);
-    setStatus(`Synced ${pending.length}`);
+    setStatus(`Sent ${pending.length}`);
     return {sent: pending.length, remaining: 0};
   } else {
-    setStatus(`Sync failed (${pending.length} kept)`);
+    setStatus(`Send failed (${pending.length} kept)`);
     return {sent: 0, remaining: pending.length};
   }
 }
@@ -396,8 +401,8 @@ async function autoSyncAll(){
   await syncPending(getCodingPending, saveCodingPending, SHEETS.coding_log);
 }
 function scheduleAutoSync(){
-  setTimeout(autoSyncAll, 3000);
-  setInterval(autoSyncAll, 60000);
+  setTimeout(autoSyncAll, 5000);
+  setInterval(autoSyncAll, 120000);
 }
 
 // ============================================================
@@ -537,11 +542,7 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    c.innerHTML=`<div class="err-banner">Products failed to load.
-
-${fetchLog[SHEETS.products] || "(no log)"}
-
-Error: ${err.message}</div>
+    c.innerHTML=`<div class="err-banner">Products failed to load.\n\n${fetchLog[SHEETS.products] || "(no log)"}\n\nError: ${err.message}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
@@ -575,15 +576,22 @@ function renderCompanySettings(){
 
 async function testWrite(){
   const out = document.getElementById("test-out");
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth()+1).padStart(2,'0');
-  const expectedTab = "test_conn_" + y + "-" + m;
-  out.textContent = "Sending test row to sheet 'test_conn'…\nExpecting response tab: " + expectedTab + "\n\nWaiting up to 5s…";
-  const ok = await postRows("test_conn", [{When: new Date().toISOString(), Test: "1"}]);
-  out.textContent += "\n\npostRows returned: " + ok;
-  out.textContent += "\n\nNow check your Google Sheet for a tab called:\n   " + expectedTab;
-  out.textContent += "\n\nIf it exists and has 1 row → the write path works.\nIf not → the iframe approach didn't reach Apps Script either.";
+  out.textContent = "Opening a small tab with the test URL…\nExpecting tab: test_conn\n\n";
+  try {
+    const url = buildWriteUrl("test_conn", [{When: new Date().toISOString(), Test: "1"}]);
+    const w = window.open(url, "_blank", "width=80,height=80,left=-1000,top=-1000");
+    out.textContent += "window.open returned: " + (w ? "an object (success)" : "null (blocked!)");
+    if(w && !w.closed){
+      await new Promise(r => setTimeout(r, 2500));
+      try { w.close(); } catch(e){}
+      out.textContent += "\n\nIf a tab flashed briefly — check your sheet for tab 'test_conn'.";
+      out.textContent += "\nIf no tab flashed, your browser blocked the pop-up. Enable pop-ups for this site.";
+    } else {
+      out.textContent += "\n\nPopup was BLOCKED. In Chrome: tap ⋮ → Settings → Site settings → Pop-ups → Allow for toluene2010.github.io";
+    }
+  } catch(e){
+    out.textContent += "\n\nError: " + e.message;
+  }
 }
 
 function saveCompanyInfo(){
@@ -605,9 +613,7 @@ async function renderWeighingProductPicker(){
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
-    c.innerHTML=`<div class="info-banner">
-      ${productsWithBOM.size} of ${products.length} products have a BOM.
-    </div>
+    c.innerHTML=`<div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
     <input class="search" id="w-search" placeholder="Search product…"/>
     <div id="w-list"></div>`;
     const render=(q="")=>{
@@ -833,7 +839,7 @@ function openPicker(title, items, allowCustom){
 }
 
 // ============================================================
-// BATCH ENTRY FORM (Shrinkwrap & Coding)
+// BATCH ENTRY FORM
 // ============================================================
 async function renderBatchEntry(opts){
   const c = document.getElementById("module-content");
@@ -1051,7 +1057,7 @@ async function renderBatchEntry(opts){
       renderPending();
 
       if(r.sent > 0 && r.remaining === 0){
-        alert(`✅ ${r.sent} entr${r.sent===1?"y":"ies"} sent to Google Sheet.`);
+        alert(`✅ ${r.sent} entr${r.sent===1?"y":"ies"} sent.\n\nA tiny tab may have flashed — that's the sender.\nCheck your Google Sheet for the ${opts.sheetName}_YYYY-MM tab.`);
       } else if(r.remaining > 0){
         alert(`⚠️ ${r.remaining} entr${r.remaining===1?"y":"ies"} kept on phone. Tap "Sync Now" to retry.`);
       }
