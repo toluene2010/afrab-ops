@@ -7,14 +7,27 @@
 <title>AFRAB Operations</title>
 <link rel="manifest" href="manifest.json">
 <style>
-  :root{--bg:#0f172a;--panel:#1e293b;--border:#334155;--text:#e2e8f0;--dim:#94a3b8;--accent:#0ea5e9;--green:#22c55e;--orange:#f59e0b;--red:#ef4444}
+  :root{
+    --bg:#0f172a;
+    --panel:#1e293b;
+    --border:#334155;
+    --text:#e2e8f0;
+    --dim:#94a3b8;
+    --accent:#33a7b5;
+    --accent2:#7fbbe3;
+    --brand-red:#ff0000;
+    --green:#22c55e;
+    --orange:#f59e0b;
+    --red:#ef4444;
+  }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
   .screen{display:none;padding:16px 16px 70px 16px}
   .screen.active{display:block}
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:10px}
+  header img{flex-shrink:0}
   h1{font-size:20px;margin:0;color:var(--accent)}
-  .role-pill{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer}
+  .role-pill{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;white-space:nowrap}
   .role-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px}
   .role-btn{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:16px;color:var(--text);text-align:left;cursor:pointer}
   .role-btn:active{transform:scale(.97)}
@@ -26,8 +39,8 @@
   .module .sub{font-size:11px;color:var(--dim);margin-top:4px}
   .module.packing{border-color:#2563eb}.module.filling{border-color:#14b8a6}
   .module.receipt{border-color:#f59e0b}.module.batch{border-color:#8b5cf6}
-  .module.shrink{border-color:#ec4899}.module.coding{border-color:#22c55e}
-  .module.weighing{border-color:#0ea5e9}.module.admin{border-color:#64748b}
+  .module.shrink{border-color:#ec4899}.module.coding{border-color:var(--green)}
+  .module.weighing{border-color:var(--accent)}.module.admin{border-color:#64748b}
 
   .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
   .product-item:active{background:#273449}
@@ -72,9 +85,9 @@
   .alert-pill.danger{background:#7f1d1d;color:#fecaca}
   .alert-pill.expired{background:#374151;color:#cbd5e1}
 
-  .info-banner{background:#1e3a5f;border:1px solid #0ea5e9;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
-  .err-banner{background:#7f1d1d;border:1px solid #ef4444;border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
-  .ok-banner{background:#14532d;border:1px solid #22c55e;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#86efac}
+  .info-banner{background:#1e3a5f;border:1px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
+  .err-banner{background:#7f1d1d;border:1px solid var(--red);border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
+  .ok-banner{background:#14532d;border:1px solid var(--green);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#86efac}
 
   .field{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);margin-bottom:10px}
   .field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
@@ -88,18 +101,19 @@
   .remove-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 
   @media print {
-    body { background: white; color: black; }
+    body { background: white; color: black; font-family: Georgia, 'Times New Roman', serif; }
     .screen, .status-bar, .back-btn { display: none !important; }
-    .print-only { display: block !important; padding: 20px; color: black; font-family: 'Times New Roman', serif; }
-    .print-header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; }
-    .print-header h1 { font-size: 22px; margin: 0 0 6px 0; color: black; }
+    .print-only { display: block !important; padding: 20px; color: black; }
+    .print-header { border-bottom: 3px solid #ff0000; padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; }
+    .print-header img { height: 60px; }
+    .print-header h1 { font-size: 22px; margin: 0 0 6px 0; color: #ff0000; font-family: 'Alegreya Sans', Arial, sans-serif; }
     .print-header .addr { font-size: 13px; line-height: 1.5; color: black; }
-    .print-title { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; text-transform: uppercase; }
+    .print-title { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; text-transform: uppercase; color: #ff0000; font-family: 'Alegreya Sans', Arial, sans-serif; }
     .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 20px; }
     .print-meta b { display: inline-block; min-width: 100px; }
     .print-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
     .print-table th, .print-table td { border: 1px solid #000; padding: 6px 8px; text-align: left; vertical-align: top; }
-    .print-table th { background: #eee; font-weight: bold; }
+    .print-table th { background: #fff5f5; font-weight: bold; color: #ff0000; }
     .print-sign { display: flex; justify-content: space-between; margin-top: 40px; font-size: 13px; }
     .print-sign div { border-top: 1px solid #000; width: 40%; padding-top: 4px; }
   }
@@ -109,13 +123,22 @@
 <body>
 
 <div id="screen-role" class="screen active">
-  <header><h1>AFRAB Operations</h1></header>
+  <header>
+    <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726"
+         alt="Afrab Chem" style="height:56px;width:56px;border-radius:12px"/>
+    <h1 style="flex:1;margin-left:12px">AFRAB Operations</h1>
+  </header>
   <p style="color:var(--dim);font-size:14px;margin-bottom:8px">Welcome. Select your role to continue.</p>
   <div class="role-grid" id="role-grid"></div>
 </div>
 
 <div id="screen-home" class="screen">
-  <header><h1>AFRAB Operations</h1><div class="role-pill" id="role-pill">—</div></header>
+  <header>
+    <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726"
+         alt="Afrab Chem" style="height:40px;width:40px;border-radius:10px"/>
+    <h1 style="flex:1;margin-left:10px">AFRAB Operations</h1>
+    <div class="role-pill" id="role-pill">—</div>
+  </header>
   <div class="modules" id="modules"></div>
 </div>
 
@@ -153,10 +176,10 @@ const SHEETS = {
 // COMPANY
 // ============================================================
 const COMPANY_DEFAULT = {
-  name:    "AFRAB PHARMACEUTICALS LTD",
-  address: "123 Industrial Avenue, Lagos, Nigeria",
+  name:    "AFRAB CHEM LIMITED",
+  address: "Lagos, Nigeria",
   phone:   "+234 806 521 1837",
-  email:   "info@afrab.com",
+  email:   "info@afrabchem.com",
 };
 function getCompany(){
   try{ return JSON.parse(localStorage.getItem("afrab.company")) || COMPANY_DEFAULT; }
@@ -287,7 +310,7 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA JSONP (gviz) — reads
+// FETCH VIA JSONP (gviz)
 // ============================================================
 const fetchLog = {};
 function fetchSheet(sheetName){
@@ -328,7 +351,7 @@ function fetchSheet(sheetName){
           headers.forEach((h, i) => { if(h) obj[h] = r[i] || ""; });
           return obj;
         });
-        fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + headers.length + " mode=" + (haveLabels ? "gviz" : "manual");
+        fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + headers.length;
         cleanup(); resolve(rows);
       } catch(err){ cleanup(); fetchLog[sheetName] = "Parse error"; reject(err); }
     };
@@ -344,8 +367,6 @@ function fetchSheet(sheetName){
 
 // ============================================================
 // WRITE VIA NEW-TAB NAVIGATION
-// Opens the Apps Script URL in a tiny hidden tab, then closes it.
-// Top-level navigation is never blocked by CORS.
 // ============================================================
 function buildWriteUrl(sheetName, rows){
   return API_BASE
@@ -353,33 +374,24 @@ function buildWriteUrl(sheetName, rows){
     + "&sheet=" + encodeURIComponent(sheetName)
     + "&rows=" + encodeURIComponent(JSON.stringify(rows));
 }
-
 async function postRows(sheetName, rows){
   if(!rows || !rows.length) return false;
   const url = buildWriteUrl(sheetName, rows);
-
-  // Strategy 1: window.open in a tiny off-screen tab, then close it
   try {
     const w = window.open(url, "_blank", "width=80,height=80,left=-1000,top=-1000");
     if(w && !w.closed){
-      // Give Apps Script time to process
       await new Promise(r => setTimeout(r, 2500));
       try { w.close(); } catch(e){}
       return true;
     }
-  } catch(e) { /* fall through */ }
-
-  // Strategy 2: fetch with redirect manual (silent fallback)
+  } catch(e) { }
   try {
     await fetch(url, {method: "GET", mode: "no-cors", redirect: "manual", cache: "no-store"});
     await new Promise(r => setTimeout(r, 1500));
     return true;
-  } catch(e) { /* fall through */ }
-
+  } catch(e) { }
   return false;
 }
-
-// Sync a queue
 async function syncPending(storageGet, storageSave, sheetName){
   const pending = storageGet();
   if(!pending.length) return {sent: 0, remaining: 0};
@@ -389,12 +401,10 @@ async function syncPending(storageGet, storageSave, sheetName){
     storageSave([]);
     setStatus(`Sent ${pending.length}`);
     return {sent: pending.length, remaining: 0};
-  } else {
-    setStatus(`Send failed (${pending.length} kept)`);
-    return {sent: 0, remaining: pending.length};
   }
+  setStatus(`Send failed (${pending.length} kept)`);
+  return {sent: 0, remaining: pending.length};
 }
-
 async function autoSyncAll(){
   if(!navigator.onLine) return;
   await syncPending(getShrinkPending, saveShrinkPending, SHEETS.shrink_log);
@@ -405,7 +415,6 @@ function scheduleAutoSync(){
   setInterval(autoSyncAll, 120000);
 }
 
-// ============================================================
 function findKey(obj, ...keywords){
   if(!obj) return null;
   const keys = Object.keys(obj);
@@ -433,7 +442,6 @@ async function loadProducts(){
     .map(x => ({code:String(x[kCode]).trim(), name:String(x[kName]||"").trim()}));
   return state.products;
 }
-
 async function loadRawMaterials(){
   if(state.rawMaterials.length) return state.rawMaterials;
   try{
@@ -461,7 +469,6 @@ async function loadRawMaterials(){
   }catch(e){ state.rawMaterials = []; }
   return state.rawMaterials;
 }
-
 async function loadBOM(){
   if(state.bom.length) return state.bom;
   try{
@@ -476,7 +483,6 @@ async function loadBOM(){
   }catch(e){ state.bom = []; }
   return state.bom;
 }
-
 async function loadMachines(){
   if(state.machines.length) return state.machines;
   const DEFAULTS = ["Machine 1","Machine 2","Machine 3"];
@@ -500,7 +506,6 @@ async function loadMachines(){
   }
   return state.machines;
 }
-
 async function loadOperators(){
   if(state.operators.length) return state.operators;
   try{
@@ -522,7 +527,7 @@ async function loadOperators(){
 }
 
 // ============================================================
-// ADMIN
+// ADMIN (with Refresh button)
 // ============================================================
 async function renderAdmin(){
   const c=document.getElementById("module-content");
@@ -530,8 +535,12 @@ async function renderAdmin(){
   try{
     const p=await loadProducts();
     setStatus(`${p.length} products loaded`);
-    c.innerHTML=`<input class="search" id="prod-search" placeholder="Search products…"/>
-      <div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products</div>
+    c.innerHTML=`
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <input class="search" id="prod-search" placeholder="Search products…" style="flex:1;margin-bottom:0"/>
+        <button class="action-btn alt" onclick="refreshAllData()" style="margin:0">🔄 Refresh</button>
+      </div>
+      <div style="color:var(--dim);font-size:12px;margin-bottom:10px">${p.length} products loaded from sheet</div>
       <div id="prod-list"></div>`;
     const render=(q="")=>{
       const list=document.getElementById("prod-list");
@@ -542,9 +551,23 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input",e=>render(e.target.value));
   }catch(err){
-    c.innerHTML=`<div class="err-banner">Products failed to load.\n\n${fetchLog[SHEETS.products] || "(no log)"}\n\nError: ${err.message}</div>
+    c.innerHTML=`<div class="err-banner">Products failed to load.
+
+${fetchLog[SHEETS.products] || "(no log)"}
+
+Error: ${err.message}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
+}
+
+function refreshAllData(){
+  state.products = [];
+  state.rawMaterials = [];
+  state.bom = [];
+  state.machines = [];
+  state.operators = [];
+  setStatus("Refreshing…");
+  renderAdmin();
 }
 
 // ============================================================
@@ -573,7 +596,6 @@ function renderCompanySettings(){
   `;
   showScreen("screen-module");
 }
-
 async function testWrite(){
   const out = document.getElementById("test-out");
   out.textContent = "Opening a small tab with the test URL…\nExpecting tab: test_conn\n\n";
@@ -593,7 +615,6 @@ async function testWrite(){
     out.textContent += "\n\nError: " + e.message;
   }
 }
-
 function saveCompanyInfo(){
   saveCompany({
     name: document.getElementById("co-name").value.trim(),
@@ -613,9 +634,13 @@ async function renderWeighingProductPicker(){
   try{
     const [products, raws, bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
     const productsWithBOM = new Set(bom.map(x=>x.product));
-    c.innerHTML=`<div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
-    <input class="search" id="w-search" placeholder="Search product…"/>
-    <div id="w-list"></div>`;
+    c.innerHTML=`
+      <div class="info-banner">
+        ${productsWithBOM.size} of ${products.length} products have a BOM.
+        <div style="margin-top:8px"><button class="action-btn alt" onclick="refreshAllData();renderWeighingProductPicker()" style="margin:0;font-size:12px">🔄 Refresh</button></div>
+      </div>
+      <input class="search" id="w-search" placeholder="Search product…"/>
+      <div id="w-list"></div>`;
     const render=(q="")=>{
       const list=document.getElementById("w-list");
       const query=q.trim().toLowerCase();
@@ -752,7 +777,7 @@ function showFinishedBatch(code){
 }
 
 // ============================================================
-// PRINT BOM
+// PRINT BOM — with Afrab logo & red header
 // ============================================================
 function printBOM(productCode){
   const product = state.products.find(p=>p.code===productCode);
@@ -779,8 +804,11 @@ function printBOM(productCode){
   const tableRows = rows.map(r=>`<tr><td>${r.n}</td><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.batch)}</td><td>${esc(r.qc)}</td><td>${esc(r.mfg)}</td><td>${esc(r.exp)}</td></tr>`).join("");
   document.getElementById("print-area").innerHTML = `
     <div class="print-header">
-      <h1>${esc(co.name)}</h1>
-      <div class="addr">${esc(co.address)}<br>${co.phone?"Phone: "+esc(co.phone):""}${co.email?" &nbsp;|&nbsp; Email: "+esc(co.email):""}</div>
+      <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/301/h/66/theme/light/logo.png?c=1bxid64Mup7aczewSAYMX&t=1781515577466" alt="Afrab Chem"/>
+      <div>
+        <h1>${esc(co.name)}</h1>
+        <div class="addr">${esc(co.address)}<br>${co.phone?"Phone: "+esc(co.phone):""}${co.email?" &nbsp;|&nbsp; Email: "+esc(co.email):""}</div>
+      </div>
     </div>
     <div class="print-title">Bill of Materials</div>
     <div class="print-meta">
@@ -1032,7 +1060,6 @@ async function renderBatchEntry(opts){
         alert("Fill in at least one complete entry.\n\nRequired: Product, Batch No, Machine, Operator, Quantity.");
         return;
       }
-
       const toSave = valid.map(e => ({
         Date: d,
         Product: e.product,
@@ -1043,19 +1070,16 @@ async function renderBatchEntry(opts){
         Quantity: e.qty,
         "Saved At": new Date().toISOString(),
       }));
-
       const existing = opts.storageGet();
       opts.storageSave(existing.concat(toSave));
       entries = [{product:"",productCode:"",batch:"",machine:"",operator:"",qty:""}];
       renderEntries();
       renderPending();
       renderSyncBanner();
-
       setStatus("Sending…");
       const r = await syncPending(opts.storageGet, opts.storageSave, opts.sheetName);
       renderSyncBanner();
       renderPending();
-
       if(r.sent > 0 && r.remaining === 0){
         alert(`✅ ${r.sent} entr${r.sent===1?"y":"ies"} sent.\n\nA tiny tab may have flashed — that's the sender.\nCheck your Google Sheet for the ${opts.sheetName}_YYYY-MM tab.`);
       } else if(r.remaining > 0){
