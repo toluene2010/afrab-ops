@@ -287,7 +287,7 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA JSONP (gviz)
+// FETCH VIA JSONP (gviz) — reads
 // ============================================================
 const fetchLog = {};
 function fetchSheet(sheetName){
@@ -343,9 +343,7 @@ function fetchSheet(sheetName){
 }
 
 // ============================================================
-// WRITE VIA APPS SCRIPT — GET request (query string)
-// POST bodies get dropped on the Apps Script redirect, so we
-// send everything as URL parameters instead.
+// WRITE VIA IFRAME — bypasses CORS completely
 // ============================================================
 async function postRows(sheetName, rows){
   if(!rows || !rows.length) return false;
@@ -354,14 +352,29 @@ async function postRows(sheetName, rows){
       + "?action=append"
       + "&sheet=" + encodeURIComponent(sheetName)
       + "&rows=" + encodeURIComponent(JSON.stringify(rows));
-    await fetch(url, { method: "GET", mode: "no-cors" });
-    return true;
+    return await new Promise((resolve) => {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "absolute";
+      iframe.style.width = "1px";
+      iframe.style.height = "1px";
+      iframe.style.border = "0";
+      iframe.style.opacity = "0";
+      iframe.style.pointerEvents = "none";
+      iframe.src = url;
+      let settled = false;
+      const done = (ok) => { if(settled) return; settled = true; resolve(ok); };
+      iframe.onload = () => done(true);
+      iframe.onerror = () => done(false);
+      document.body.appendChild(iframe);
+      setTimeout(() => done(true), 4000);
+      setTimeout(() => { try { iframe.remove(); } catch(e){} }, 8000);
+    });
   } catch(e) {
     return false;
   }
 }
 
-// Generic sync: sends all entries in the local queue, keeps unsent ones
+// Generic sync
 async function syncPending(storageGet, storageSave, sheetName){
   const pending = storageGet();
   if(!pending.length) return {sent: 0, remaining: 0};
@@ -377,7 +390,6 @@ async function syncPending(storageGet, storageSave, sheetName){
   }
 }
 
-// Auto-sync on load + every 60s
 async function autoSyncAll(){
   if(!navigator.onLine) return;
   await syncPending(getShrinkPending, saveShrinkPending, SHEETS.shrink_log);
@@ -460,7 +472,6 @@ async function loadBOM(){
   return state.bom;
 }
 
-// STRICT — requires exact "Machine Name" column, rejects product codes
 async function loadMachines(){
   if(state.machines.length) return state.machines;
   const DEFAULTS = ["Machine 1","Machine 2","Machine 3"];
@@ -485,7 +496,6 @@ async function loadMachines(){
   return state.machines;
 }
 
-// STRICT — requires exact "Operator Name" column, rejects product codes
 async function loadOperators(){
   if(state.operators.length) return state.operators;
   try{
@@ -537,7 +547,7 @@ Error: ${err.message}</div>
 }
 
 // ============================================================
-// COMPANY SETTINGS
+// COMPANY SETTINGS + DEBUG
 // ============================================================
 function renderCompanySettings(){
   document.getElementById("module-title").textContent="Company Info";
@@ -555,9 +565,27 @@ function renderCompanySettings(){
     <input class="field" id="co-email" value="${esc(co.email)}"/>
     <button class="action-btn green" onclick="saveCompanyInfo()">Save</button>
     <button class="action-btn alt" onclick="goHome()">Cancel</button>
+    <hr style="border:0;border-top:1px solid var(--border);margin:20px 0"/>
+    <div style="font-size:12px;color:var(--dim);margin-bottom:8px">Debug tools:</div>
+    <button class="action-btn orange" onclick="testWrite()">🔬 Test Write to Sheet</button>
+    <div id="test-out" style="font-family:monospace;font-size:11px;color:var(--dim);margin-top:10px;white-space:pre-wrap;line-height:1.6"></div>
   `;
   showScreen("screen-module");
 }
+
+async function testWrite(){
+  const out = document.getElementById("test-out");
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const expectedTab = "test_conn_" + y + "-" + m;
+  out.textContent = "Sending test row to sheet 'test_conn'…\nExpecting response tab: " + expectedTab + "\n\nWaiting up to 5s…";
+  const ok = await postRows("test_conn", [{When: new Date().toISOString(), Test: "1"}]);
+  out.textContent += "\n\npostRows returned: " + ok;
+  out.textContent += "\n\nNow check your Google Sheet for a tab called:\n   " + expectedTab;
+  out.textContent += "\n\nIf it exists and has 1 row → the write path works.\nIf not → the iframe approach didn't reach Apps Script either.";
+}
+
 function saveCompanyInfo(){
   saveCompany({
     name: document.getElementById("co-name").value.trim(),
