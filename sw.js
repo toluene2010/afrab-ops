@@ -1,4 +1,4 @@
-const CACHE = "afrab-ops-v2";
+const CACHE = "afrab-ops-v3";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", e => {
@@ -22,7 +22,7 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // HTML pages — network-first (always try to get fresh)
+  // HTML pages — network-first
   if (e.request.mode === "navigate" || e.request.destination === "document") {
     e.respondWith(
       fetch(e.request).then(res => {
