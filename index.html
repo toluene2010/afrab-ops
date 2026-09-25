@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
 <title>AFRAB Operations</title>
-<link rel="manifest" href="manifest.json">
 <style>
   :root{
     --bg:#0f172a; --panel:#1e293b; --border:#334155; --text:#e2e8f0;
@@ -35,12 +34,10 @@
   .module.shrink{border-color:#ec4899}.module.coding{border-color:var(--green)}
   .module.weighing{border-color:var(--accent)}.module.admin{border-color:#64748b}
   .module.dashboard{border-color:#facc15}
-
   .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
   .product-item:active{background:#273449}
   .product-item .code{color:var(--dim);font-size:12px;font-family:monospace}
   .product-item .name{font-size:14px;margin-top:4px}
-
   .search{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);margin-bottom:12px}
   .search:focus{outline:none;border-color:var(--accent)}
   .back-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:13px;cursor:pointer;margin-bottom:16px}
@@ -50,22 +47,17 @@
   .action-btn.red{background:var(--red)}
   .action-btn.orange{background:var(--orange)}
   .action-btn.purple{background:var(--purple)}
-
   .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:14px;line-height:1.6}
   .loading{text-align:center;padding:40px 20px;color:var(--dim)}
-
   .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:10px 16px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;z-index:10}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
   .dot.offline{background:var(--red)}
-  .dot.busy{background:var(--orange)}
-
   .material-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;border-left:5px solid var(--green);position:relative}
   .material-card.warn{border-left-color:var(--orange)}
   .material-card.danger{border-left-color:var(--red)}
   .material-card.expired{border-left-color:#475569;opacity:0.7}
   .material-card.done{opacity:0.5;border-left-color:#475569}
   .material-card.ticked{border-left-color:var(--accent2);box-shadow:0 0 0 2px var(--accent2) inset}
-
   .mat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
   .mat-code{font-family:monospace;color:var(--dim);font-size:12px}
   .mat-name{font-size:15px;font-weight:600;margin:4px 0 10px 0}
@@ -76,20 +68,16 @@
   .tick-btn.on{background:var(--green);border-color:var(--green);color:white}
   .mark-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;margin-top:10px}
   .unmark-btn{background:transparent;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;margin-top:10px}
-
   .alert-pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-top:8px}
   .alert-pill.ok{background:#14532d;color:#86efac}
   .alert-pill.warn{background:#78350f;color:#fdba74}
   .alert-pill.danger{background:#7f1d1d;color:#fecaca}
   .alert-pill.expired{background:#374151;color:#cbd5e1}
-
   .info-banner{background:#1e3a5f;border:1px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#bae6fd}
   .err-banner{background:#7f1d1d;border:1px solid var(--red);border-radius:10px;padding:12px 14px;font-size:12px;margin-bottom:14px;color:#fecaca;font-family:monospace;white-space:pre-wrap;word-break:break-all}
   .ok-banner{background:#14532d;border:1px solid var(--green);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#86efac}
-
   .field{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);margin-bottom:10px}
   .field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
-
   .entry-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
   .entry-card h4{margin:0 0 12px 0;color:var(--accent);font-size:14px;display:flex;justify-content:space-between;align-items:center}
   .entry-row{margin-bottom:10px}
@@ -97,10 +85,8 @@
   .entry-row input,.entry-row select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;color:var(--text)}
   .picker-btn{width:100%;background:#1e3a5f;border:1px solid var(--accent);color:var(--text);border-radius:8px;padding:10px;font-size:14px;text-align:left;cursor:pointer}
   .remove-btn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
-
   .session-banner{background:#312e81;border:1px solid #6366f1;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;color:#c7d2fe}
   .batch-pill{display:inline-block;background:var(--purple);color:#fff;padding:4px 10px;border-radius:20px;font-size:13px;font-family:monospace;font-weight:700}
-
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
   .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
   .stat-card .stat-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px}
@@ -110,22 +96,20 @@
   .stat-card.green{border-color:var(--green)}
   .stat-card.orange{border-color:var(--orange)}
   .stat-card.purple{border-color:var(--purple)}
-
   .list-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
   .list-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
   .list-row:last-child{border-bottom:none}
   .list-row .name{color:var(--text)}
   .list-row .num{font-family:monospace;color:var(--accent2);font-weight:700}
-
   @media print {
     body { background: white; color: black; font-family: Georgia, 'Times New Roman', serif; }
     .screen, .status-bar, .back-btn { display: none !important; }
     .print-only { display: block !important; padding: 20px; color: black; }
     .print-header { border-bottom: 3px solid #ff0000; padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; }
     .print-header img { height: 60px; }
-    .print-header h1 { font-size: 22px; margin: 0 0 6px 0; color: #ff0000; font-family: 'Alegreya Sans', Arial, sans-serif; }
+    .print-header h1 { font-size: 22px; margin: 0 0 6px 0; color: #ff0000; }
     .print-header .addr { font-size: 13px; line-height: 1.5; color: black; }
-    .print-title { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; text-transform: uppercase; color: #ff0000; font-family: 'Alegreya Sans', Arial, sans-serif; }
+    .print-title { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; text-transform: uppercase; color: #ff0000; }
     .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 20px; }
     .print-meta b { display: inline-block; min-width: 100px; }
     .print-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
@@ -141,8 +125,7 @@
 
 <div id="screen-role" class="screen active">
   <header>
-    <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726"
-         alt="Afrab Chem" style="height:56px;width:56px;border-radius:12px"/>
+    <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726" alt="Afrab Chem" style="height:56px;width:56px;border-radius:12px"/>
     <h1 style="flex:1;margin-left:12px">AFRAB Operations</h1>
   </header>
   <p style="color:var(--dim);font-size:14px;margin-bottom:8px">Welcome. Select your role to continue.</p>
@@ -151,8 +134,7 @@
 
 <div id="screen-home" class="screen">
   <header>
-    <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726"
-         alt="Afrab Chem" style="height:40px;width:40px;border-radius:10px"/>
+    <img src="https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726" alt="Afrab Chem" style="height:40px;width:40px;border-radius:10px"/>
     <h1 style="flex:1;margin-left:10px">AFRAB Operations</h1>
     <div class="role-pill" id="role-pill">—</div>
   </header>
@@ -447,60 +429,62 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA APPS SCRIPT (JSONP — bypasses CORS)
+// FETCH VIA GVIZ (original, working)
 // ============================================================
 const fetchLog = {};
 function fetchSheet(sheetName){
   return new Promise((resolve, reject) => {
-    const cb = "afrab_cb_" + Math.random().toString(36).slice(2);
+    const cb = "gviz_cb_" + Math.random().toString(36).slice(2);
     let done = false, script = null;
     const cleanup = () => {
       if (done) return; done = true;
       try { delete window[cb]; } catch(e){}
       if (script && script.parentNode) script.parentNode.removeChild(script);
     };
-    const t0 = Date.now();
-    const timer = setTimeout(() => {
-      cleanup();
-      fetchLog[sheetName] = "TIMEOUT after 20s";
-      reject(new Error("Timeout"));
-    }, 20000);
-
+    const timer = setTimeout(() => { cleanup(); fetchLog[sheetName] = "TIMEOUT"; reject(new Error("Timeout")); }, 20000);
     window[cb] = function(data){
       clearTimeout(timer);
       try {
-        if (data && !Array.isArray(data) && data.error) {
-          fetchLog[sheetName] = "API: " + data.error;
-          cleanup(); reject(new Error(data.error)); return;
+        if (!data || data.status !== "ok" || !data.table) {
+          fetchLog[sheetName] = "Bad response"; cleanup(); reject(new Error("Invalid response")); return;
         }
-        if (!Array.isArray(data)) {
-          fetchLog[sheetName] = "Unexpected shape";
-          cleanup(); reject(new Error("Unexpected response shape")); return;
+        const rawRows = (data.table.rows || []).map(row =>
+          (row.c || []).map(cell => {
+            if(!cell) return "";
+            if(cell.f !== undefined && cell.f !== null) return String(cell.f);
+            if(cell.v !== undefined && cell.v !== null) return String(cell.v);
+            return "";
+          })
+        );
+        const cols = (data.table.cols || []).map(c => String(c.label || "").trim());
+        const haveLabels = cols.length > 0 && cols.some(l => l && /[a-z]/i.test(l));
+        let headers, dataRows;
+        if (haveLabels) { headers = cols; dataRows = rawRows; }
+        else {
+          const copy = rawRows.slice();
+          headers = (copy.shift() || []).map(h => String(h).trim());
+          dataRows = copy;
         }
-        fetchLog[sheetName] = "OK rows=" + data.length + " in " + (Date.now() - t0) + "ms";
-        cleanup(); resolve(data);
-      } catch(err){
-        fetchLog[sheetName] = "Parse error";
-        cleanup(); reject(err);
-      }
+        const rows = dataRows.map(r => {
+          const obj = {};
+          headers.forEach((h, i) => { if(h) obj[h] = r[i] || ""; });
+          return obj;
+        });
+        fetchLog[sheetName] = "OK rows=" + rows.length + " cols=" + headers.length;
+        cleanup(); resolve(rows);
+      } catch(err){ cleanup(); fetchLog[sheetName] = "Parse error"; reject(err); }
     };
-
-    const url = API_BASE + "?action=read&sheet=" + encodeURIComponent(sheetName) + "&callback=" + cb;
+    const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
+                "/gviz/tq?sheet=" + encodeURIComponent(sheetName) +
+                "&tqx=out:json;responseHandler:" + cb;
     script = document.createElement("script");
     script.src = url;
-    script.onerror = () => {
-      clearTimeout(timer);
-      fetchLog[sheetName] = "Script load failed";
-      cleanup();
-      reject(new Error("Script load failed"));
-    };
+    script.onerror = () => { clearTimeout(timer); fetchLog[sheetName] = "Script load failed"; cleanup(); reject(new Error("Script load failed")); };
     document.head.appendChild(script);
   });
 }
-
 async function safeFetch(sheetName){
-  try { return await fetchSheet(sheetName); }
-  catch(e){ return []; }
+  try { return await fetchSheet(sheetName); } catch(e){ return []; }
 }
 
 // ============================================================
@@ -823,7 +807,6 @@ async function showWeighingForProduct(productCode){
         <div style="font-family:monospace;color:var(--dim);font-size:12px">${esc(product.code)}</div>
         <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(product.name)}</div>
       </div>
-
       <div class="session-banner">
         <div style="margin-bottom:10px"><b>📋 Weighing Session</b></div>
         <div class="entry-row">
@@ -835,7 +818,6 @@ async function showWeighingForProduct(productCode){
           <input id="wStaff" value="${esc(sessionStaff)}" placeholder="Your name"/>
         </div>
       </div>
-
       <button class="action-btn green" id="wPrintBOM" style="margin-bottom:14px">🖨️ Print BOM</button>
     `;
 
@@ -856,12 +838,10 @@ async function showWeighingForProduct(productCode){
       });
     });
 
-    html += `
-      <div style="font-size:12px;color:var(--dim);margin-bottom:8px">
+    html += `<div style="font-size:12px;color:var(--dim);margin-bottom:8px">
         Materials needed — tap the circle ✓ after you weigh each one.
         ${tickedCount > 0 ? `<b style="color:var(--green)">${tickedCount} ticked</b>` : ""}
-      </div>
-    `;
+      </div>`;
 
     materials.forEach((m, idx)=>{
       html += `<div style="margin-bottom:14px">
@@ -904,11 +884,9 @@ async function showWeighingForProduct(productCode){
       html += `</div>`;
     });
 
-    html += `
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+    html += `<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
         <button class="action-btn green" id="wConfirm" style="width:100%">✅ Confirm Weighing Session</button>
-      </div>
-    `;
+      </div>`;
 
     c.innerHTML = html;
 
@@ -929,7 +907,6 @@ async function showWeighingForProduct(productCode){
       const who = String(sessionStaff||"").trim();
       if(!bn){ alert("Please enter the batch number being produced."); return; }
       if(!who){ alert("Please enter your name (Weighed by)."); return; }
-
       const tickedMaterials = [];
       materials.forEach(m=>{
         m.active.forEach(r=>{
@@ -939,9 +916,7 @@ async function showWeighingForProduct(productCode){
           }
         });
       });
-
       const compact = tickedMaterials.map(x => `${x.code}/${x.qc}/${x.batch}`).join("; ");
-
       const row = {
         "Date": todayString(),
         "Product": product.name,
@@ -952,9 +927,7 @@ async function showWeighingForProduct(productCode){
         "Material Count": tickedMaterials.length,
         "Logged At": new Date().toISOString(),
       };
-
       localStorage.setItem("afrab.lastweigher", who);
-
       const existing = getPending(WEIGHING_STORAGE);
       savePending(WEIGHING_STORAGE, existing.concat([row]));
       setStatus("Sending…");
@@ -1680,7 +1653,6 @@ async function renderDashboard(){
         <div><div style="font-size:12px;color:var(--dim)">As of ${new Date().toLocaleString()}</div></div>
         <button class="action-btn alt" onclick="renderDashboard()" style="margin:0">🔄 Refresh</button>
       </div>
-
       <h2>📅 Today · ${esc(today)}</h2>
       <div class="stat-grid">
         <div class="stat-card accent">
@@ -1704,28 +1676,22 @@ async function renderDashboard(){
           <div class="stat-sub">batches weighed</div>
         </div>
       </div>
-
       <h2>🏭 Filling Lines Today</h2>
       <div class="list-card">${listHtml(lineStats)}</div>
-
       <h2>🏷️ Coding — Per Machine Today</h2>
       <div class="list-card">${listHtml(codingStats)}</div>
-
       <h2>🎞️ Shrinkwrap — Per Machine Today</h2>
       <div class="list-card">${listHtml(shrinkStats)}</div>
-
       <h2>📆 This Week · from ${esc(startOfWeek)}</h2>
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value">${weekEntries}</div></div>
         <div class="stat-card"><div class="stat-label">Output</div><div class="stat-value">${weekOutput.toLocaleString()}</div></div>
       </div>
-
       <h2>🗓️ This Month · ${esc(month)}</h2>
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value">${monthEntries}</div></div>
         <div class="stat-card"><div class="stat-label">Output</div><div class="stat-value">${monthOutput.toLocaleString()}</div></div>
       </div>
-
       <h2>⏳ Pending Sync</h2>
       <div class="list-card">
         ${pendingTotal === 0
@@ -1752,14 +1718,6 @@ async function renderDashboard(){
 // UTIL
 // ============================================================
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-
-// Self-destruct SW registration — safe to run on every load.
-// The SW unregisters itself on activation, so this becomes a no-op after one visit.
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  });
-}
 
 init();
 </script>
