@@ -258,7 +258,7 @@ function sha256Hex(str){
 }
 
 // ============================================================
-// API CALL — JSONP to Apps Script
+// API CALL (JSONP)
 // ============================================================
 function apiCall(action, params){
   return new Promise((resolve, reject) => {
@@ -270,11 +270,7 @@ function apiCall(action, params){
       if (script && script.parentNode) script.parentNode.removeChild(script);
     };
     const timer = setTimeout(() => { cleanup(); reject(new Error("Timeout")); }, 30000);
-    window[cb] = (data) => {
-      clearTimeout(timer);
-      cleanup();
-      resolve(data);
-    };
+    window[cb] = (data) => { clearTimeout(timer); cleanup(); resolve(data); };
     let url = API_BASE + "?action=" + encodeURIComponent(action) + "&callback=" + cb;
     Object.keys(params || {}).forEach(k => { url += "&" + k + "=" + encodeURIComponent(params[k]); });
     script = document.createElement("script");
@@ -436,8 +432,7 @@ function init(){
 }
 
 function showLogin(){
-  const box = document.getElementById("loginErrBox");
-  box.innerHTML = "";
+  document.getElementById("loginErrBox").innerHTML = "";
   document.getElementById("li-user").value = "";
   document.getElementById("li-pass").value = "";
   const btn = document.getElementById("li-btn");
@@ -569,7 +564,7 @@ function openModule(id){
 }
 
 // ============================================================
-// FETCH VIA GVIZ (for sheets)
+// GVIZ FETCH
 // ============================================================
 const fetchLog = {};
 function fetchSheet(sheetName){
@@ -608,16 +603,12 @@ function fetchSheet(sheetName){
 async function safeFetch(sheetName){ try { return await fetchSheet(sheetName); } catch(e){ return []; } }
 
 // ============================================================
-// WRITE via apiCall
+// WRITE
 // ============================================================
 async function postRows(sheetName, rows){
   if (!rows || !rows.length) return false;
   try {
-    const resp = await apiCall("append", {
-      token: getToken(),
-      sheet: sheetName,
-      rows: JSON.stringify(rows)
-    });
+    const resp = await apiCall("append", { token: getToken(), sheet: sheetName, rows: JSON.stringify(rows) });
     return !!(resp && resp.ok);
   } catch(e) { return false; }
 }
@@ -800,7 +791,7 @@ function saveCompanyInfo(){
 }
 
 // ============================================================
-// ADMIN — Users (JSONP, no redirects)
+// ADMIN — Users
 // ============================================================
 async function renderUsers(banner) {
   document.getElementById("module-title").textContent = "Users";
@@ -888,11 +879,7 @@ async function addNewUser(){
 
 async function toggleUserActive(username, active){
   try {
-    const resp = await apiCall("setActive", {
-      token: getToken(),
-      targetUser: username,
-      active: active ? "true" : "false"
-    });
+    const resp = await apiCall("setActive", { token: getToken(), targetUser: username, active: active ? "true" : "false" });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     renderUsers(`<div class="ok-banner">✅ Updated</div>`);
   } catch(err) { alert(err.message); }
@@ -904,11 +891,7 @@ async function resetUserPass(username){
   if (newPass.length < 6) { alert("Passcode must be at least 6 characters"); return; }
   const hash = sha256Hex(newPass);
   try {
-    const resp = await apiCall("resetPass", {
-      token: getToken(),
-      targetUser: username,
-      newPasshash: hash
-    });
+    const resp = await apiCall("resetPass", { token: getToken(), targetUser: username, newPasshash: hash });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     alert("✅ Passcode reset");
   } catch(err) { alert(err.message); }
