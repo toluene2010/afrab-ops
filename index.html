@@ -195,6 +195,13 @@ function setAuth(a){ localStorage.setItem(AUTH_KEY, JSON.stringify(a)); }
 function clearAuth(){ localStorage.removeItem(AUTH_KEY); }
 function getToken(){ const a = getAuth(); return a ? a.token : ""; }
 
+// SHA-256 in hex
+async function sha256Hex(str){
+  const buf = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ============================================================
 // TEMPLATES
 // ============================================================
@@ -404,7 +411,7 @@ function showLogin(){
   showScreen("screen-login");
 }
 
-function doLogin(){
+async function doLogin(){
   const user = document.getElementById("li-user").value.trim().toLowerCase();
   const pass = document.getElementById("li-pass").value;
   if (!user || !pass) {
@@ -413,18 +420,12 @@ function doLogin(){
   }
   document.getElementById("li-btn").disabled = true;
   document.getElementById("li-btn").textContent = "Signing in…";
-
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = API_BASE;
-  form.style.display = "none";
-  const mk = (n,v) => { const i = document.createElement("input"); i.type="hidden"; i.name=n; i.value=v; form.appendChild(i); };
-  mk("action", "login");
-  mk("username", user);
-  mk("passcode", pass);
-  mk("returnTo", location.origin + location.pathname);
-  document.body.appendChild(form);
-  form.submit();
+  const hash = await sha256Hex(pass);
+  const url = API_BASE + "?action=login" +
+    "&username=" + encodeURIComponent(user) +
+    "&passhash=" + encodeURIComponent(hash) +
+    "&returnTo=" + encodeURIComponent(location.origin + location.pathname);
+  window.location.href = url;
 }
 
 function doLogout(){
@@ -485,7 +486,6 @@ function showHome(){
     t.innerHTML = `<div class="icon">👥</div><div><div class="label">Users</div><div class="sub">Add / manage logins</div></div>`;
     t.onclick = renderUsers;
     grid.appendChild(t);
-
     const t2 = document.createElement("button");
     t2.className = "module"; t2.style.borderColor = "#f59e0b";
     t2.innerHTML = `<div class="icon">🏢</div><div><div class="label">Company Info</div><div class="sub">Edit report header</div></div>`;
@@ -554,12 +554,11 @@ function fetchSheet(sheetName){
 async function safeFetch(sheetName){ try { return await fetchSheet(sheetName); } catch(e){ return []; } }
 
 // ============================================================
-// WRITE
+// WRITE (GET with token)
 // ============================================================
 function buildWriteUrl(sheetName, rows){
-  const token = getToken();
   return API_BASE + "?action=append&sheet=" + encodeURIComponent(sheetName) +
-         "&token=" + encodeURIComponent(token) +
+         "&token=" + encodeURIComponent(getToken()) +
          "&rows=" + encodeURIComponent(JSON.stringify(rows));
 }
 async function postRows(sheetName, rows){
@@ -751,7 +750,7 @@ function saveCompanyInfo(){
 }
 
 // ============================================================
-// ADMIN — Users (full-page redirect pattern)
+// ADMIN — Users (GET-based, redirect pattern)
 // ============================================================
 function renderUsers(){
   document.getElementById("module-title").textContent = "Users";
@@ -764,11 +763,8 @@ function renderUsers(){
   if (resultJson) {
     try {
       const r = JSON.parse(resultJson);
-      if (r.error) {
-        resultBanner = `<div class="err-banner">${esc(r.error)}</div>`;
-      } else if (r.action && r.action !== "list") {
-        resultBanner = `<div class="ok-banner">✅ Done</div>`;
-      }
+      if (r.error) resultBanner = `<div class="err-banner">${esc(r.error)}</div>`;
+      else if (r.action && r.action !== "list") resultBanner = `<div class="ok-banner">✅ Done</div>`;
     } catch(e){}
   }
 
@@ -842,15 +838,16 @@ function refreshUsersList(){
   postToAppsScript("listUsers", {});
 }
 
-function addNewUser(){
+async function addNewUser(){
   const username = document.getElementById("nu-user").value.trim().toLowerCase();
   const name = document.getElementById("nu-name").value.trim();
   const passcode = document.getElementById("nu-pass").value;
   const role = document.getElementById("nu-role").value;
   if (!username || !name || !passcode || role == null) { alert("All fields required"); return; }
   if (passcode.length < 6) { alert("Passcode must be at least 6 characters"); return; }
+  const hash = await sha256Hex(passcode);
   sessionStorage.removeItem("afrab.users.cache");
-  postToAppsScript("addUser", { newUsername: username, newName: name, newPasscode: passcode, newRole: role });
+  postToAppsScript("addUser", { newUsername: username, newName: name, newPasshash: hash, newRole: role });
 }
 
 function toggleUserActive(username, active){
@@ -858,28 +855,23 @@ function toggleUserActive(username, active){
   postToAppsScript("setActive", { targetUser: username, active: active ? "true" : "false" });
 }
 
-function resetUserPass(username){
+async function resetUserPass(username){
   const newPass = prompt("New passcode for " + username + " (min 6 chars):");
   if (!newPass) return;
   if (newPass.length < 6) { alert("Passcode must be at least 6 characters"); return; }
+  const hash = await sha256Hex(newPass);
   sessionStorage.removeItem("afrab.users.cache");
-  postToAppsScript("resetPass", { targetUser: username, newPasscode: newPass });
+  postToAppsScript("resetPass", { targetUser: username, newPasshash: hash });
 }
 
-// Full-page POST — the page will navigate away and return via redirect
+// All user-management actions go through GET redirect
 function postToAppsScript(action, params){
   const returnTo = location.origin + location.pathname;
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = API_BASE;
-  form.style.display = "none";
-  const mk = (n,v) => { const i = document.createElement("input"); i.type="hidden"; i.name=n; i.value=v; form.appendChild(i); };
-  mk("action", action);
-  mk("token", getToken());
-  mk("returnTo", returnTo);
-  Object.keys(params || {}).forEach(k => mk(k, params[k]));
-  document.body.appendChild(form);
-  form.submit();
+  let url = API_BASE + "?action=" + encodeURIComponent(action);
+  url += "&token=" + encodeURIComponent(getToken());
+  url += "&returnTo=" + encodeURIComponent(returnTo);
+  Object.keys(params || {}).forEach(k => { url += "&" + k + "=" + encodeURIComponent(params[k]); });
+  window.location.href = url;
 }
 
 // ============================================================
@@ -1148,7 +1140,7 @@ function printBOM(productCode){
 }
 
 // ============================================================
-// GENERIC PICKER
+// PICKER
 // ============================================================
 function openPicker(title, items, allowCustom){
   return new Promise(resolve => {
@@ -1188,7 +1180,7 @@ function getPickerSource(source, machineNames, operatorNames){
 }
 
 // ============================================================
-// GENERIC TEMPLATE
+// TEMPLATE ENTRY
 // ============================================================
 async function renderTemplate(templateKey){
   const tpl = TEMPLATES[templateKey];
@@ -1725,15 +1717,12 @@ async function renderDashboard(){
 document.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("li-btn");
   if (btn) btn.addEventListener("click", doLogin);
-  const user = document.getElementById("li-user");
   const pass = document.getElementById("li-pass");
+  const user = document.getElementById("li-user");
   if (pass) pass.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
   if (user) user.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("li-pass").focus(); });
 });
 
-// ============================================================
-// GO
-// ============================================================
 init();
 </script>
 </body>
