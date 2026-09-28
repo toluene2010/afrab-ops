@@ -95,8 +95,6 @@
   .list-row:last-child{border-bottom:none}
   .list-row .name{color:var(--text)}
   .list-row .num{font-family:monospace;color:var(--accent2);font-weight:700}
-
-  /* LOGIN */
   .login-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px}
   .login-wrap img{height:80px;width:80px;border-radius:18px;margin-bottom:16px}
   .login-title{font-size:22px;color:var(--accent);margin-bottom:6px;text-align:center}
@@ -106,14 +104,12 @@
   .login-btn{width:100%;max-width:360px;background:var(--accent);color:white;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}
   .login-btn:disabled{opacity:.5;cursor:not-allowed}
   .login-err{color:#fecaca;background:#7f1d1d;border:1px solid var(--red);border-radius:8px;padding:12px;font-size:13px;width:100%;max-width:360px;margin-bottom:16px;text-align:center}
-
   .user-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px}
   .user-row:last-child{border-bottom:none}
   .user-row .uinfo{flex:1}
   .user-row .uname{font-size:14px;font-weight:600}
   .user-row .umeta{font-size:11px;color:var(--dim);margin-top:2px}
   .user-row .inactive{opacity:.5}
-
   @media print {
     body { background: white; color: black; }
     .screen, .status-bar, .back-btn { display: none !important; }
@@ -198,7 +194,6 @@ function getAuth(){ try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || n
 function setAuth(a){ localStorage.setItem(AUTH_KEY, JSON.stringify(a)); }
 function clearAuth(){ localStorage.removeItem(AUTH_KEY); }
 function getToken(){ const a = getAuth(); return a ? a.token : ""; }
-function isAdmin(){ const a = getAuth(); return a && a.role === "admin"; }
 
 // ============================================================
 // TEMPLATES
@@ -355,16 +350,12 @@ function init(){
 function handleAuthRedirectFromHash(){
   const hash = location.hash || "";
   if (!hash || hash.length < 2) return;
-
-  // Strip leading #
   const params = new URLSearchParams(hash.slice(1));
-
   if (params.has("auth")) {
     const token = params.get("auth");
     const username = params.get("u") || "";
     const name = params.get("n") || "";
     const role = (params.get("r") || "").toLowerCase();
-    // Decode token to get expiry
     let exp = Date.now() + 30*24*60*60*1000;
     try {
       const b64 = token.split(".")[0];
@@ -402,7 +393,6 @@ function doLogin(){
   document.getElementById("li-btn").disabled = true;
   document.getElementById("li-btn").textContent = "Signing in…";
 
-  // Full-page form POST to Apps Script
   const form = document.createElement("form");
   form.method = "POST";
   form.action = API_BASE;
@@ -460,7 +450,7 @@ function showHome(){
     const mi = MODULES[m];
     const t = document.createElement("button");
     t.className = `module ${mi.color}`;
-    const icon = m === "dashboard" ? "📊" : (ROLE_LABELS[m] ? {packing:"🧴",filling:"💧",receipt:"📥",batch:"📦",shrink:"🎞️",coding:"🏷️",weighing:"⚖️",admin:"🔧"}[m] : "•");
+    const icon = m === "dashboard" ? "📊" : ({packing:"🧴",filling:"💧",receipt:"📥",batch:"📦",shrink:"🎞️",coding:"🏷️",weighing:"⚖️",admin:"🔧"}[m] || "•");
     t.innerHTML = `<div class="icon">${icon}</div><div><div class="label">${mi.title}</div><div class="sub">${mi.sub}</div></div>`;
     t.onclick = () => openModule(m);
     grid.appendChild(t);
@@ -540,7 +530,7 @@ function fetchSheet(sheetName){
 async function safeFetch(sheetName){ try { return await fetchSheet(sheetName); } catch(e){ return []; } }
 
 // ============================================================
-// WRITE VIA NEW-TAB (now with token)
+// WRITE VIA NEW-TAB (with token)
 // ============================================================
 function buildWriteUrl(sheetName, rows){
   const token = getToken();
@@ -700,7 +690,7 @@ async function renderAdmin(){
     render();
     document.getElementById("prod-search").addEventListener("input", e => render(e.target.value));
   } catch(err){
-    c.innerHTML = `<div class="err-banner">Products failed to load.\n\n${fetchLog[SHEETS.products] || "(no log)"}\n\nError: ${err.message}</div>
+    c.innerHTML = `<div class="err-banner">Products failed to load.\n\n${fetchLog[SHEETS.products] || "(no log)"}\n\nError: ${esc(err.message)}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
@@ -832,6 +822,7 @@ function resetUserPass(username){
 }
 
 // Generic iframe+postMessage call to Apps Script
+// FIXED: accepts redirect origin (script.googleusercontent.com)
 function postToAppsScript(action, params){
   return new Promise((resolve, reject) => {
     const frameName = "afrabFrame_" + Math.random().toString(36).slice(2);
@@ -841,21 +832,27 @@ function postToAppsScript(action, params){
     document.body.appendChild(iframe);
 
     let done = false;
+    let form = null;
     const cleanup = () => {
       if (done) return; done = true;
       window.removeEventListener("message", handler);
+      try { if (form) document.body.removeChild(form); } catch(e){}
       try { document.body.removeChild(iframe); } catch(e){}
-      try { document.body.removeChild(form); } catch(e){}
     };
     const handler = (event) => {
-      if (event.origin !== "https://script.google.com") return;
+      const okOrigins = [
+        "https://script.google.com",
+        "https://script.googleusercontent.com",
+        "https://docs.google.com"
+      ];
+      if (okOrigins.indexOf(event.origin) === -1) return;
       if (!event.data || !event.data.afrab) return;
       cleanup();
       resolve(event.data.afrab);
     };
     window.addEventListener("message", handler);
 
-    const form = document.createElement("form");
+    form = document.createElement("form");
     form.method = "POST";
     form.action = API_BASE;
     form.target = frameName;
@@ -867,7 +864,7 @@ function postToAppsScript(action, params){
     document.body.appendChild(form);
     form.submit();
 
-    setTimeout(() => { if (!done) { cleanup(); reject(new Error("Request timeout")); } }, 20000);
+    setTimeout(() => { if (!done) { cleanup(); reject(new Error("Request timeout")); } }, 30000);
   });
 }
 
