@@ -1,6 +1,7 @@
 {
   "name": "AFRAB Operations",
   "short_name": "AFRAB Ops",
+  "description": "Track daily packing, filling, weighing, shrink-wrap, coding, and product receipt operations for Afrab Chem.",
   "start_url": "./?v=1",
   "scope": "./",
   "display": "standalone",
@@ -9,16 +10,22 @@
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230ea5e9'/><text x='96' y='125' font-size='100' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>A</text></svg>",
+      "src": "https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%230ea5e9'/><text x='256' y='330' font-size='280' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>A</text></svg>",
+      "src": "https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
