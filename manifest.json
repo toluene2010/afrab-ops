@@ -20,12 +20,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "https://cdn.brandfetch.io/iduO5hv2yD/w/400/h/400/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1781515577726",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }
