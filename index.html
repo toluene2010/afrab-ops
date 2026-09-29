@@ -28,8 +28,8 @@
   .module .label{font-size:14px;font-weight:600;margin-top:10px}
   .module .sub{font-size:11px;color:var(--dim);margin-top:4px}
   .module.packing{border-color:#2563eb}.module.filling{border-color:#14b8a6}
-  .module.receipt{border-color:#f59e0b}.module.batch{border-color:#8b5cf6}
-  .module.shrink{border-color:#ec4899}.module.coding{border-color:var(--green)}
+  .module.receipt{border-color:#f59e0b}.module.shrink{border-color:#ec4899}
+  .module.coding{border-color:var(--green)}
   .module.weighing{border-color:var(--accent)}.module.admin{border-color:#64748b}
   .module.dashboard{border-color:#facc15}
   .product-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
@@ -183,7 +183,7 @@ const FILLING_LINES = ["100ml line (FL 2)","15ml drops line (FL1)","Ibuprofen Li
 
 const ROLE_LABELS = {
   packing:"Packing Supervisor", filling:"Filling Supervisor", receipt:"Product Receiver",
-  batch:"Production Batch", shrink:"Label / Shrinkwrap", coding:"Coding Supervisor",
+  shrink:"Label / Shrinkwrap", coding:"Coding Supervisor",
   weighing:"Weighing Staff", admin:"Admin"
 };
 
@@ -281,7 +281,7 @@ function apiCall(action, params){
 }
 
 // ============================================================
-// LOCAL CACHE — for reference data
+// LOCAL CACHE
 // ============================================================
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -295,19 +295,13 @@ function cacheGet(key){
     return obj.v;
   } catch(e) { return null; }
 }
-
 function cacheSet(key, value){
   try { localStorage.setItem("afrab.cache." + key, JSON.stringify({ t: Date.now(), v: value })); } catch(e) {}
 }
-
 function cacheClear(key){
   try {
     if (key) localStorage.removeItem("afrab.cache." + key);
-    else {
-      Object.keys(localStorage).forEach(k => {
-        if (k.indexOf("afrab.cache.") === 0) localStorage.removeItem(k);
-      });
-    }
+    else Object.keys(localStorage).forEach(k => { if (k.indexOf("afrab.cache.") === 0) localStorage.removeItem(k); });
   } catch(e) {}
 }
 
@@ -317,6 +311,7 @@ function cacheClear(key){
 const TEMPLATES = {
   shrinkwrap: {
     title:"Shrinkwrap", sheetName:"shrinkwrap_log", storageKey:"afrab.shrink.pending",
+    category:"shrinkwrap",
     fields:[
       { key:"batch_no", label:"Batch No", type:"text", placeholder:"e.g. 26001" },
       { key:"machine",  label:"Machine",  type:"picker", source:"machines",  allowCustom:true },
@@ -327,6 +322,7 @@ const TEMPLATES = {
   },
   coding: {
     title:"Coding", sheetName:"coding_log", storageKey:"afrab.coding.pending",
+    category:"coding",
     fields:[
       { key:"batch_no", label:"Batch No", type:"text", placeholder:"e.g. 26001" },
       { key:"machine",  label:"Machine",  type:"picker", source:"machines",  allowCustom:true },
@@ -337,6 +333,7 @@ const TEMPLATES = {
   },
   packing: {
     title:"Packing", sheetName:"packing_log", storageKey:"afrab.packing.pending",
+    category:"packing",
     fields:[
       { key:"batch_no",   label:"Batch No",   type:"text",   placeholder:"e.g. 26001" },
       { key:"batch_size", label:"Batch Size", type:"number", placeholder:"e.g. 5000" },
@@ -347,6 +344,7 @@ const TEMPLATES = {
   },
   filling: {
     title:"Filling", sheetName:"filling_log", storageKey:"afrab.filling.pending",
+    category:"filling",
     fields:[
       { key:"batch_no",        label:"Batch No",            type:"text",   placeholder:"e.g. 26001" },
       { key:"filling_line",    label:"Filling Line",        type:"picker", source:"filling_lines", allowCustom:false },
@@ -488,7 +486,6 @@ async function doLogin(){
     });
     state.auth = getAuth();
     state.role = resp.role;
-    // Pre-warm cache in background
     setTimeout(() => {
       loadProducts().catch(()=>{});
       loadBOM().catch(()=>{});
@@ -638,7 +635,7 @@ function fetchSheet(sheetName){
 async function safeFetch(sheetName){ try { return await fetchSheet(sheetName); } catch(e){ return []; } }
 
 // ============================================================
-// WRITE / BATCH / RECEIPT via Apps Script
+// WRITE / BATCH / RECEIPT
 // ============================================================
 async function postRows(sheetName, rows){
   if (!rows || !rows.length) return false;
@@ -692,7 +689,7 @@ function findKey(obj, ...keywords){
 }
 
 // ============================================================
-// LOADERS (with cache)
+// LOADERS (with cache + category filter)
 // ============================================================
 async function loadProducts(forceRefresh){
   if (!forceRefresh && state.products.length) return state.products;
@@ -757,54 +754,75 @@ async function loadBOM(forceRefresh){
   return state.bom;
 }
 
-async function loadMachines(forceRefresh){
-  if (!forceRefresh && state.machines.length) return state.machines;
+async function loadMachines(forceRefresh, category){
+  if (!forceRefresh && state.machines.length) return filterByCategory(state.machines, category);
   if (!forceRefresh) {
     const cached = cacheGet("machines");
-    if (cached && Array.isArray(cached)) { state.machines = cached; return cached; }
+    if (cached && Array.isArray(cached)) { state.machines = cached; return filterByCategory(cached, category); }
   }
-  const DEFAULTS = ["Machine 1","Machine 2","Machine 3"];
+  const DEFAULTS = ["Machine 1","Machine 2","Machine 3"].map(n => ({ name:n, category:"" }));
   try {
     const rows = await fetchSheet(SHEETS.machines);
     if (Array.isArray(rows) && rows.length) {
       const sample = rows[0];
-      const kName = Object.keys(sample).find(k => k.toLowerCase() === "machine name");
-      const kActive = Object.keys(sample).find(k => k.toLowerCase() === "active");
+      const keys = Object.keys(sample);
+      const kName = keys.find(k => k.toLowerCase() === "machine name");
+      const kActive = keys.find(k => k.toLowerCase() === "active");
+      const kCat = keys.find(k => k.toLowerCase() === "category");
       if (kName) {
-        state.machines = rows.filter(x => x[kName] && String(x[kName]).trim())
+        state.machines = rows
+          .filter(x => x[kName] && String(x[kName]).trim())
           .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
           .filter(x => !/^FP\d+/i.test(String(x[kName]).trim()))
-          .map(x => ({ name:String(x[kName]||"").trim() }));
+          .map(x => ({
+            name: String(x[kName]||"").trim(),
+            category: kCat ? String(x[kCat]||"").trim().toLowerCase() : ""
+          }));
       }
     }
   } catch(e){}
-  if (state.machines.length === 0) state.machines = DEFAULTS.map(n => ({ name:n }));
+  if (state.machines.length === 0) state.machines = DEFAULTS;
   cacheSet("machines", state.machines);
-  return state.machines;
+  return filterByCategory(state.machines, category);
 }
 
-async function loadOperators(forceRefresh){
-  if (!forceRefresh && state.operators.length) return state.operators;
+async function loadOperators(forceRefresh, category){
+  if (!forceRefresh && state.operators.length) return filterByCategory(state.operators, category);
   if (!forceRefresh) {
     const cached = cacheGet("operators");
-    if (cached && Array.isArray(cached)) { state.operators = cached; return cached; }
+    if (cached && Array.isArray(cached)) { state.operators = cached; return filterByCategory(cached, category); }
   }
   try {
     const rows = await fetchSheet(SHEETS.operators);
     if (Array.isArray(rows) && rows.length) {
       const sample = rows[0];
-      const kName = Object.keys(sample).find(k => k.toLowerCase() === "operator name");
-      const kActive = Object.keys(sample).find(k => k.toLowerCase() === "active");
+      const keys = Object.keys(sample);
+      const kName = keys.find(k => k.toLowerCase() === "operator name");
+      const kActive = keys.find(k => k.toLowerCase() === "active");
+      const kCat = keys.find(k => k.toLowerCase() === "category");
       if (kName) {
-        state.operators = rows.filter(x => x[kName] && String(x[kName]).trim())
+        state.operators = rows
+          .filter(x => x[kName] && String(x[kName]).trim())
           .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
           .filter(x => !/^FP\d+/i.test(String(x[kName]).trim()))
-          .map(x => ({ name:String(x[kName]||"").trim() }));
+          .map(x => ({
+            name: String(x[kName]||"").trim(),
+            category: kCat ? String(x[kCat]||"").trim().toLowerCase() : ""
+          }));
       }
     }
   } catch(e){}
   cacheSet("operators", state.operators);
-  return state.operators;
+  return filterByCategory(state.operators, category);
+}
+
+function filterByCategory(list, category){
+  if (!category) return list;
+  const cat = String(category).toLowerCase();
+  return list.filter(x => {
+    const c = String(x.category||"").toLowerCase();
+    return !c || c === "both" || c === cat;
+  });
 }
 
 // ============================================================
@@ -1381,14 +1399,19 @@ function getPickerSource(source, machineNames, operatorNames){
 }
 
 // ============================================================
-// TEMPLATE (Packing / Filling / Shrink / Coding)
+// TEMPLATE
 // ============================================================
 async function renderTemplate(templateKey){
   const tpl = TEMPLATES[templateKey];
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading…</div>`;
   try {
-    const [products, machines, operators] = await Promise.all([loadProducts(), loadMachines(), loadOperators()]);
+    const category = tpl.category || "";
+    const [products, machines, operators] = await Promise.all([
+      loadProducts(),
+      loadMachines(false, category),
+      loadOperators(false, category)
+    ]);
     const machineNames = machines.map(m => m.name || m);
     const operatorNames = operators.map(o => o.name || o);
 
