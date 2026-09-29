@@ -177,7 +177,6 @@ const AUTH_KEY = "afrab.auth.v1";
 
 const SHEETS = { products:"Drug database", raw_materials:"raw_materials", bom:"bom", machines:"machines", operators:"operators" };
 const RECEIPT_SHEET = "receipt_log", RECEIPT_STORAGE = "afrab.receipt.pending";
-const BATCH_REGISTRY_SHEET = "batch_registry", BATCH_STORAGE = "afrab.batch.pending";
 const WEIGHING_SHEET = "weighing_log", WEIGHING_STORAGE = "afrab.weighing.pending";
 
 const FILLING_LINES = ["100ml line (FL 2)","15ml drops line (FL1)","Ibuprofen Line (FL3)","Manual Line","External","Antibiotics"];
@@ -282,6 +281,37 @@ function apiCall(action, params){
 }
 
 // ============================================================
+// LOCAL CACHE — for reference data
+// ============================================================
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+
+function cacheGet(key){
+  try {
+    const raw = localStorage.getItem("afrab.cache." + key);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.t) return null;
+    if (Date.now() - obj.t > CACHE_TTL_MS) return null;
+    return obj.v;
+  } catch(e) { return null; }
+}
+
+function cacheSet(key, value){
+  try { localStorage.setItem("afrab.cache." + key, JSON.stringify({ t: Date.now(), v: value })); } catch(e) {}
+}
+
+function cacheClear(key){
+  try {
+    if (key) localStorage.removeItem("afrab.cache." + key);
+    else {
+      Object.keys(localStorage).forEach(k => {
+        if (k.indexOf("afrab.cache.") === 0) localStorage.removeItem(k);
+      });
+    }
+  } catch(e) {}
+}
+
+// ============================================================
 // TEMPLATES
 // ============================================================
 const TEMPLATES = {
@@ -357,19 +387,6 @@ function makeReference(){
   const d = new Date();
   return "REC-" + d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + "-" + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0');
 }
-function yearPrefix(){ return String(new Date().getFullYear()).slice(-2); }
-function nextBatchNumber(registry){
-  const prefix = yearPrefix();
-  let maxSeq = 0;
-  (registry || []).forEach(row => {
-    const bn = String(row["Batch No"] || "").trim();
-    if (bn.startsWith(prefix) && bn.length >= 5) {
-      const seq = parseInt(bn.slice(2), 10);
-      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-    }
-  });
-  return prefix + String(maxSeq + 1).padStart(3, '0');
-}
 function currentMonthString(){ const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,'0'); }
 function todayString(){ return new Date().toISOString().slice(0,10); }
 function parseYMD(s){
@@ -402,7 +419,6 @@ const MODULES = {
   packing:{ title:"Packing Entry", sub:"Daily packer output", color:"packing" },
   filling:{ title:"Filling Entry", sub:"Filling line production", color:"filling" },
   receipt:{ title:"Product Receipt", sub:"Receive finished products", color:"receipt" },
-  batch:{ title:"Production Batch", sub:"Track batch by year", color:"batch" },
   shrink:{ title:"Shrink Wrapping", sub:"Per machine, per day", color:"shrink" },
   coding:{ title:"Coding", sub:"Per coder, per batch", color:"coding" },
   weighing:{ title:"Weighing", sub:"Raw materials for a batch", color:"weighing" },
@@ -411,8 +427,8 @@ const MODULES = {
 };
 const ROLE_MODULES = {
   packing:["packing"], filling:["filling"], receipt:["receipt"],
-  batch:["batch"], shrink:["shrink"], coding:["coding"], weighing:["weighing"],
-  admin:["dashboard","packing","filling","receipt","batch","shrink","coding","weighing","admin"],
+  shrink:["shrink"], coding:["coding"], weighing:["weighing"],
+  admin:["dashboard","packing","filling","receipt","shrink","coding","weighing","admin"],
 };
 
 // ============================================================
@@ -472,6 +488,11 @@ async function doLogin(){
     });
     state.auth = getAuth();
     state.role = resp.role;
+    // Pre-warm cache in background
+    setTimeout(() => {
+      loadProducts().catch(()=>{});
+      loadBOM().catch(()=>{});
+    }, 500);
     showHome();
   } catch(err) {
     document.getElementById("loginErrBox").innerHTML = `<div class="login-err">${esc(err.message || "Network error")}</div>`;
@@ -486,6 +507,7 @@ function doLogout(){
   state.auth = null;
   state.role = null;
   state.products = []; state.rawMaterials = []; state.bom = []; state.machines = []; state.operators = [];
+  cacheClear();
   showLogin();
 }
 
@@ -525,7 +547,7 @@ function showHome(){
     const mi = MODULES[m];
     const t = document.createElement("button");
     t.className = `module ${mi.color}`;
-    const icon = m === "dashboard" ? "📊" : ({packing:"🧴",filling:"💧",receipt:"📥",batch:"📦",shrink:"🎞️",coding:"🏷️",weighing:"⚖️",admin:"🔧"}[m] || "•");
+    const icon = m === "dashboard" ? "📊" : ({packing:"🧴",filling:"💧",receipt:"📥",shrink:"🎞️",coding:"🏷️",weighing:"⚖️",admin:"🔧"}[m] || "•");
     t.innerHTML = `<div class="icon">${icon}</div><div><div class="label">${mi.title}</div><div class="sub">${mi.sub}</div></div>`;
     t.onclick = () => openModule(m);
     grid.appendChild(t);
@@ -536,6 +558,19 @@ function showHome(){
     t.innerHTML = `<div class="icon">👥</div><div><div class="label">Users</div><div class="sub">Add / manage logins</div></div>`;
     t.onclick = renderUsers;
     grid.appendChild(t);
+
+    const t3 = document.createElement("button");
+    t3.className = "module"; t3.style.borderColor = "#facc15";
+    t3.innerHTML = `<div class="icon">📅</div><div><div class="label">Production</div><div class="sub">This year's batches</div></div>`;
+    t3.onclick = renderProductionViewer;
+    grid.appendChild(t3);
+
+    const t4 = document.createElement("button");
+    t4.className = "module"; t4.style.borderColor = "#f59e0b";
+    t4.innerHTML = `<div class="icon">📦</div><div><div class="label">Archive Production</div><div class="sub">Move completed batches</div></div>`;
+    t4.onclick = renderArchiveProduction;
+    grid.appendChild(t4);
+
     const t2 = document.createElement("button");
     t2.className = "module"; t2.style.borderColor = "#f59e0b";
     t2.innerHTML = `<div class="icon">🏢</div><div><div class="label">Company Info</div><div class="sub">Edit report header</div></div>`;
@@ -559,7 +594,6 @@ function openModule(id){
   else if (id === "packing") renderTemplate("packing");
   else if (id === "filling") renderTemplate("filling");
   else if (id === "receipt") renderReceipt();
-  else if (id === "batch") renderBatch();
   else if (id === "dashboard") renderDashboard();
   else c.innerHTML = `<div class="empty">${MODULES[id].title}</div>`;
 }
@@ -604,7 +638,7 @@ function fetchSheet(sheetName){
 async function safeFetch(sheetName){ try { return await fetchSheet(sheetName); } catch(e){ return []; } }
 
 // ============================================================
-// WRITE
+// WRITE / BATCH / RECEIPT via Apps Script
 // ============================================================
 async function postRows(sheetName, rows){
   if (!rows || !rows.length) return false;
@@ -613,6 +647,22 @@ async function postRows(sheetName, rows){
     return !!(resp && resp.ok);
   } catch(e) { return false; }
 }
+
+async function lookupBatch(batchNo) {
+  if (!batchNo) return null;
+  try {
+    const resp = await apiCall("lookupBatch", { token: getToken(), batchNo: batchNo });
+    return resp && resp.ok && resp.found ? resp : null;
+  } catch(e) { return null; }
+}
+
+async function productionSaveReceipt(items) {
+  try {
+    const resp = await apiCall("receiptSave", { token: getToken(), items: JSON.stringify(items) });
+    return resp || { ok: false, error: "No response" };
+  } catch(e) { return { ok: false, error: e.message }; }
+}
+
 async function syncPending(sheetName, storageKey){
   const pending = getPending(storageKey);
   if (!pending.length) return { sent:0, remaining:0 };
@@ -628,8 +678,6 @@ async function autoSyncAll(){
   if (!getAuth()) return;
   for (const key of Object.keys(TEMPLATES)) await syncTemplate(TEMPLATES[key]);
   await syncPending(RECEIPT_SHEET, RECEIPT_STORAGE);
-  await syncPending(BATCH_REGISTRY_SHEET, BATCH_STORAGE);
-  await syncPending(WEIGHING_SHEET, WEIGHING_STORAGE);
 }
 function scheduleAutoSync(){ setTimeout(autoSyncAll, 5000); setInterval(autoSyncAll, 120000); }
 
@@ -644,10 +692,14 @@ function findKey(obj, ...keywords){
 }
 
 // ============================================================
-// LOADERS
+// LOADERS (with cache)
 // ============================================================
-async function loadProducts(){
-  if (state.products.length) return state.products;
+async function loadProducts(forceRefresh){
+  if (!forceRefresh && state.products.length) return state.products;
+  if (!forceRefresh) {
+    const cached = cacheGet("products");
+    if (cached && Array.isArray(cached) && cached.length) { state.products = cached; return cached; }
+  }
   const rows = await fetchSheet(SHEETS.products);
   if (!Array.isArray(rows) || !rows.length) return [];
   const sample = rows[0];
@@ -658,10 +710,16 @@ async function loadProducts(){
     .filter(x => x[kCode] && String(x[kCode]).trim())
     .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
     .map(x => ({ code:String(x[kCode]).trim(), name:String(x[kName]||"").trim() }));
+  cacheSet("products", state.products);
   return state.products;
 }
-async function loadRawMaterials(){
-  if (state.rawMaterials.length) return state.rawMaterials;
+
+async function loadRawMaterials(forceRefresh){
+  if (!forceRefresh && state.rawMaterials.length) return state.rawMaterials;
+  if (!forceRefresh) {
+    const cached = cacheGet("raw_materials");
+    if (cached && Array.isArray(cached)) { state.rawMaterials = cached; return cached; }
+  }
   try {
     const rows = await fetchSheet(SHEETS.raw_materials);
     if (!Array.isArray(rows) || !rows.length) return [];
@@ -677,10 +735,16 @@ async function loadRawMaterials(){
       .filter(x => x[kCode] && String(x[kCode]).trim())
       .map(x => ({ code:String(x[kCode]||"").trim(), name:String(x[kName]||"").trim(), batch:kBatch?String(x[kBatch]||"").trim():"", qc:String(x[kQC]||"").trim(), mfg:String(x[kMFG]||"").trim(), exp:String(x[kEXP]||"").trim(), status:kStat?String(x[kStat]||"").trim():"Active" }));
   } catch(e){ state.rawMaterials = []; }
+  cacheSet("raw_materials", state.rawMaterials);
   return state.rawMaterials;
 }
-async function loadBOM(){
-  if (state.bom.length) return state.bom;
+
+async function loadBOM(forceRefresh){
+  if (!forceRefresh && state.bom.length) return state.bom;
+  if (!forceRefresh) {
+    const cached = cacheGet("bom");
+    if (cached && Array.isArray(cached)) { state.bom = cached; return cached; }
+  }
   try {
     const rows = await fetchSheet(SHEETS.bom);
     if (!Array.isArray(rows) || !rows.length) return [];
@@ -689,10 +753,16 @@ async function loadBOM(){
     const kMat = findKey(sample, "material code");
     state.bom = rows.filter(x => x[kProd] && x[kMat]).map(x => ({ product:String(x[kProd]).trim(), material:String(x[kMat]).trim() }));
   } catch(e){ state.bom = []; }
+  cacheSet("bom", state.bom);
   return state.bom;
 }
-async function loadMachines(){
-  if (state.machines.length) return state.machines;
+
+async function loadMachines(forceRefresh){
+  if (!forceRefresh && state.machines.length) return state.machines;
+  if (!forceRefresh) {
+    const cached = cacheGet("machines");
+    if (cached && Array.isArray(cached)) { state.machines = cached; return cached; }
+  }
   const DEFAULTS = ["Machine 1","Machine 2","Machine 3"];
   try {
     const rows = await fetchSheet(SHEETS.machines);
@@ -709,10 +779,16 @@ async function loadMachines(){
     }
   } catch(e){}
   if (state.machines.length === 0) state.machines = DEFAULTS.map(n => ({ name:n }));
+  cacheSet("machines", state.machines);
   return state.machines;
 }
-async function loadOperators(){
-  if (state.operators.length) return state.operators;
+
+async function loadOperators(forceRefresh){
+  if (!forceRefresh && state.operators.length) return state.operators;
+  if (!forceRefresh) {
+    const cached = cacheGet("operators");
+    if (cached && Array.isArray(cached)) { state.operators = cached; return cached; }
+  }
   try {
     const rows = await fetchSheet(SHEETS.operators);
     if (Array.isArray(rows) && rows.length) {
@@ -727,6 +803,7 @@ async function loadOperators(){
       }
     }
   } catch(e){}
+  cacheSet("operators", state.operators);
   return state.operators;
 }
 
@@ -759,9 +836,19 @@ async function renderAdmin(){
       <button class="back-btn" onclick="goHome()">← Back</button>`;
   }
 }
+
 function refreshAllData(){
   state.products = []; state.rawMaterials = []; state.bom = []; state.machines = []; state.operators = [];
-  setStatus("Refreshing…"); renderAdmin();
+  cacheClear();
+  setStatus("Refreshing from sheet…");
+  renderAdmin();
+  Promise.all([
+    loadProducts(true),
+    loadRawMaterials(true),
+    loadBOM(true),
+    loadMachines(true),
+    loadOperators(true)
+  ]).then(() => setStatus("Refreshed")).catch(() => setStatus("Refresh failed"));
 }
 
 // ============================================================
@@ -843,7 +930,6 @@ function renderUsersList(users, banner) {
           <option value="packing">Packing Supervisor</option>
           <option value="filling">Filling Supervisor</option>
           <option value="receipt">Product Receiver</option>
-          <option value="batch">Production Batch</option>
           <option value="shrink">Label / Shrinkwrap</option>
           <option value="coding">Coding Supervisor</option>
           <option value="weighing">Weighing Staff</option>
@@ -867,11 +953,7 @@ async function addNewUser(){
   const hash = sha256Hex(passcode);
   try {
     const resp = await apiCall("addUser", {
-      token: getToken(),
-      newUsername: username,
-      newName: name,
-      newPasshash: hash,
-      newRole: role
+      token: getToken(), newUsername: username, newName: name, newPasshash: hash, newRole: role
     });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     renderUsers(`<div class="ok-banner">✅ User added</div>`);
@@ -896,6 +978,76 @@ async function resetUserPass(username){
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     alert("✅ Passcode reset");
   } catch(err) { alert(err.message); }
+}
+
+// ============================================================
+// PRODUCTION VIEWER
+// ============================================================
+async function renderProductionViewer(){
+  document.getElementById("module-title").textContent = "Production";
+  const c = document.getElementById("module-content");
+  showScreen("screen-module");
+  c.innerHTML = `<div class="loading">Loading production…</div>`;
+  try {
+    const resp = await apiCall("listProduction", { token: getToken() });
+    if (!resp || resp.error) { c.innerHTML = `<div class="err-banner">${esc((resp&&resp.error)||"Failed")}</div>`; return; }
+    const rows = resp.rows || [];
+    const completed = rows.filter(r => r.hasYield).length;
+    c.innerHTML = `
+      <div class="info-banner">${rows.length} batch${rows.length===1?"":"es"} this year · ${completed} completed</div>
+      <input class="search" id="prod-filter" placeholder="Search batch / product…"/>
+      <div id="prod-rows"></div>`;
+    const render = (q) => {
+      const list = document.getElementById("prod-rows");
+      const query = (q||"").trim().toLowerCase();
+      const items = query ? rows.filter(r => (r.batchNo||"").toLowerCase().includes(query) || (r.productName||"").toLowerCase().includes(query) || (r.productCode||"").toLowerCase().includes(query)) : rows;
+      if (!items.length) { list.innerHTML = `<div class="empty">No batches.</div>`; return; }
+      list.innerHTML = items.slice().reverse().map(r => `
+        <div class="product-item">
+          <div class="code">${esc(r.batchNo)} &nbsp; · &nbsp; ${esc(r.productCode)} &nbsp; · &nbsp; ${esc(r.date)}</div>
+          <div class="name">${esc(r.productName)}</div>
+          <div style="font-size:12px;color:var(--dim);margin-top:4px">
+            Size: ${esc(r.batchSize)} &nbsp;|&nbsp;
+            Actual: ${esc(r.actualOutput || "—")} &nbsp;|&nbsp;
+            ${r.hasYield ? '<span style="color:var(--green)">✓ Completed</span>' : '<span style="color:var(--orange)">Awaiting yield</span>'}
+          </div>
+        </div>
+      `).join("");
+    };
+    render("");
+    document.getElementById("prod-filter").addEventListener("input", e => render(e.target.value));
+  } catch(err) {
+    c.innerHTML = `<div class="err-banner">${esc(err.message)}</div>
+      <button class="back-btn" onclick="goHome()">← Back</button>`;
+  }
+}
+
+// ============================================================
+// ARCHIVE PRODUCTION
+// ============================================================
+function renderArchiveProduction(){
+  document.getElementById("module-title").textContent = "Archive Production";
+  const c = document.getElementById("module-content");
+  showScreen("screen-module");
+  c.innerHTML = `
+    <div class="info-banner">
+      Rows with <b>Actual Output filled</b> will be moved to a new sheet named
+      <code>Archive_&lt;minBatch&gt;_&lt;maxBatch&gt;</code>. They will be removed from the live Production sheet.
+    </div>
+    <button class="action-btn orange" id="archBtn" style="width:100%">📦 Archive completed batches</button>
+    <div id="archMsg"></div>`;
+  document.getElementById("archBtn").onclick = async () => {
+    if (!confirm("Archive completed batches now?")) return;
+    const msg = document.getElementById("archMsg");
+    msg.innerHTML = `<div class="info-banner">Working…</div>`;
+    try {
+      const resp = await apiCall("archiveProduction", { token: getToken() });
+      if (!resp || resp.error) { msg.innerHTML = `<div class="err-banner">${esc((resp&&resp.error)||"Failed")}</div>`; return; }
+      msg.innerHTML = `<div class="ok-banner">✅ Archived ${resp.archived} batch(es) to <b>${esc(resp.sheetName)}</b></div>`;
+    } catch(err) {
+      msg.innerHTML = `<div class="err-banner">${esc(err.message)}</div>`;
+    }
+  };
 }
 
 // ============================================================
@@ -940,11 +1092,8 @@ async function showWeighingForProduct(productCode){
   const bomItems = state.bom.filter(b => b.product === productCode);
   const today = new Date();
 
-  const [registry] = await Promise.all([ safeFetch(BATCH_REGISTRY_SHEET) ]);
-  const productBatches = (registry || []).filter(r => String(r["Product Code"]||"").trim() === productCode);
-  const suggestedBatch = productBatches.length ? String(productBatches[productBatches.length-1]["Batch No"]||"").trim() : nextBatchNumber(registry);
-
-  let sessionBatch = suggestedBatch;
+  let sessionBatch = "";
+  let sessionBatchSize = "";
   let sessionStaff = localStorage.getItem("afrab.lastweigher") || "";
   const ticked = {};
 
@@ -990,17 +1139,24 @@ async function showWeighingForProduct(productCode){
         <div style="margin-bottom:10px"><b>📋 Weighing Session</b></div>
         <div class="entry-row"><label>Batch No being produced</label>
           <input id="wBatch" value="${esc(sessionBatch)}" placeholder="e.g. 26001" style="font-family:monospace;font-weight:700"/></div>
+        <div class="entry-row"><label>Batch Size (in bottles)</label>
+          <input id="wBatchSize" type="number" inputmode="numeric" value="${esc(sessionBatchSize)}" placeholder="e.g. 5000"/></div>
         <div class="entry-row" style="margin-bottom:0"><label>Weighed by (your name)</label>
           <input id="wStaff" value="${esc(sessionStaff)}" placeholder="Your name"/></div>
       </div>
       <button class="action-btn green" id="wPrintBOM" style="margin-bottom:14px">🖨️ Print BOM</button>`;
 
     if (materials.length === 0){
-      html += `<div class="empty"><b>BOM not yet added for this product.</b></div>`;
+      html += `<div class="info-banner"><b>No BOM on file — you can still log this batch.</b><br>Enter batch no, batch size, and your name above, then tap Confirm.</div>`;
+      html += `<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <button class="action-btn green" id="wConfirm" style="width:100%">✅ Confirm Weighing Session</button>
+      </div>`;
       c.innerHTML = html;
       c.querySelector("#wPrintBOM").onclick = () => printBOM(productCode);
       c.querySelector("#wBatch").addEventListener("input", e => sessionBatch = e.target.value);
+      c.querySelector("#wBatchSize").addEventListener("input", e => sessionBatchSize = e.target.value);
       c.querySelector("#wStaff").addEventListener("input", e => sessionStaff = e.target.value);
+      c.querySelector("#wConfirm").onclick = () => confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionStaff, tickedMaterials: [] });
       return;
     }
 
@@ -1055,6 +1211,7 @@ async function showWeighingForProduct(productCode){
     c.innerHTML = html;
 
     c.querySelector("#wBatch").addEventListener("input", e => sessionBatch = e.target.value);
+    c.querySelector("#wBatchSize").addEventListener("input", e => sessionBatchSize = e.target.value);
     c.querySelector("#wStaff").addEventListener("input", e => sessionStaff = e.target.value);
     c.querySelector("#wPrintBOM").onclick = () => printBOM(productCode);
     c.querySelectorAll("[data-tick]").forEach(btn => {
@@ -1066,10 +1223,6 @@ async function showWeighingForProduct(productCode){
     });
 
     c.querySelector("#wConfirm").onclick = async () => {
-      const bn = String(sessionBatch||"").trim();
-      const who = String(sessionStaff||"").trim();
-      if (!bn) { alert("Please enter the batch number being produced."); return; }
-      if (!who) { alert("Please enter your name (Weighed by)."); return; }
       const tickedMaterials = [];
       materials.forEach(m => {
         m.active.forEach(r => {
@@ -1077,23 +1230,47 @@ async function showWeighingForProduct(productCode){
           if (ticked[key]) tickedMaterials.push({ code:r.code, qc:r.qc||"", batch:r.batch||"" });
         });
       });
-      const compact = tickedMaterials.map(x => `${x.code}/${x.qc}/${x.batch}`).join("; ");
-      const row = { "Date":todayString(), "Product":product.name, "Product Code":product.code, "Batch No":bn, "Weighed By":who, "Materials":compact, "Material Count":tickedMaterials.length, "Logged At":new Date().toISOString() };
-      localStorage.setItem("afrab.lastweigher", who);
-      const existing = getPending(WEIGHING_STORAGE);
-      savePending(WEIGHING_STORAGE, existing.concat([row]));
-      setStatus("Sending…");
-      const r = await syncPending(WEIGHING_SHEET, WEIGHING_STORAGE);
-      if (r.sent > 0) {
-        alert(`✅ Weighing session logged.\n\nBatch ${bn}\n${tickedMaterials.length} material(s)\nWeighed by ${who}`);
-        renderWeighingProductPicker();
-      } else {
-        alert(`⚠️ Saved on phone. It will auto-sync when online.`);
-      }
+      confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionStaff, tickedMaterials });
     };
   };
 
   renderPage();
+}
+
+async function confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionStaff, tickedMaterials }) {
+  const bn = String(sessionBatch || "").trim();
+  const bs = String(sessionBatchSize || "").trim();
+  const who = String(sessionStaff || "").trim();
+  if (!bn) { alert("Please enter the batch number."); return; }
+  if (!bs) { alert("Please enter the batch size."); return; }
+  if (!who) { alert("Please enter your name (Weighed by)."); return; }
+
+  localStorage.setItem("afrab.lastweigher", who);
+  const compact = (tickedMaterials || []).map(x => `${x.code}/${x.qc}/${x.batch}`).join("; ");
+
+  setStatus("Sending…");
+  try {
+    const resp = await apiCall("weighConfirm", {
+      token: getToken(),
+      date: todayString(),
+      productCode: product.code,
+      productName: product.name,
+      batchNo: bn,
+      batchSize: bs,
+      weighedBy: who,
+      materials: compact
+    });
+    if (!resp || resp.error) {
+      alert("⚠️ " + ((resp && resp.error) || "Failed"));
+      setStatus("Send failed");
+      return;
+    }
+    alert(`✅ Weighing logged.\n\nBatch ${bn}\nBatch Size ${bs}\n${(tickedMaterials||[]).length} material(s)\nWeighed by ${who}`);
+    renderWeighingProductPicker();
+  } catch(err) {
+    alert("⚠️ " + err.message);
+    setStatus("Send failed");
+  }
 }
 
 function confirmMarkFinished(code, qc, batch){
@@ -1204,7 +1381,7 @@ function getPickerSource(source, machineNames, operatorNames){
 }
 
 // ============================================================
-// TEMPLATE
+// TEMPLATE (Packing / Filling / Shrink / Coding)
 // ============================================================
 async function renderTemplate(templateKey){
   const tpl = TEMPLATES[templateKey];
@@ -1286,6 +1463,22 @@ async function renderTemplate(templateKey){
           };
         } else if (tag === "input") {
           el.oninput = ev => { entries[i][key] = ev.target.value; };
+          if (key === "batch_no") {
+            el.onblur = async ev => {
+              const bn = ev.target.value.trim();
+              if (!bn) return;
+              const hit = await lookupBatch(bn);
+              if (hit) {
+                const bsInput = entriesBox.querySelector(`[data-field="${i}::batch_size"]`);
+                if (bsInput) { bsInput.value = hit.batchSize; entries[i].batch_size = hit.batchSize; }
+                if (!entries[i].product && hit.productName) {
+                  entries[i].product = hit.productName;
+                  entries[i].productCode = hit.productCode;
+                  renderEntries();
+                }
+              }
+            };
+          }
         }
       });
       entriesBox.querySelectorAll("[data-rm]").forEach(btn => {
@@ -1453,193 +1646,25 @@ async function renderReceipt(){
       if (valid.length === 0) { alert("Fill in at least one complete item."); return; }
       const ref = reference.trim() || makeReference();
       const toSave = valid.map(it => ({
-        "Date": date, "Reference No": ref, "Product": it.product, "Product Code": it.productCode,
-        "Batch No": it.batch_no, "Quantity": it.qty, "Received From": receivedFrom,
-        "Remarks": remarks, "Saved At": new Date().toISOString(),
+        date: date, reference: ref, product: it.product, productCode: it.productCode,
+        batchNo: it.batch_no, quantity: it.qty, receivedFrom: receivedFrom, remarks: remarks
       }));
-      const existing = getPending(RECEIPT_STORAGE);
-      savePending(RECEIPT_STORAGE, existing.concat(toSave));
+      setStatus("Sending…");
+      const resp = await productionSaveReceipt(toSave);
+      if (!resp || !resp.ok) {
+        alert("⚠️ " + ((resp && resp.error) || "Failed"));
+        setStatus("Send failed");
+        return;
+      }
       items = [emptyItem()]; reference = makeReference();
       root.querySelector("#rcRef").value = reference;
-      renderItems(); renderPending(); renderSyncBanner(); updateSessionBanner();
-      setStatus("Sending…");
-      const r = await syncPending(RECEIPT_SHEET, RECEIPT_STORAGE);
-      renderSyncBanner(); renderPending();
-      if (r.sent > 0 && r.remaining === 0) alert(`✅ ${r.sent} item${r.sent===1?"":"s"} sent.`);
-      else if (r.remaining > 0) alert(`⚠️ ${r.remaining} kept on phone. Tap "Sync Now" to retry.`);
+      renderItems(); updateSessionBanner();
+      alert(`✅ ${resp.receipts} item(s) saved.\n${resp.productionUpdated} production row(s) updated.`);
+      setStatus("Saved");
     };
 
     renderItems(); renderPending(); renderSyncBanner();
     setStatus("Product Receipt ready");
-  } catch(err){
-    c.innerHTML = `<div class="err-banner">Failed to load: ${esc(err.message)}</div>
-      <button class="back-btn" onclick="goHome()">← Back</button>`;
-  }
-}
-
-// ============================================================
-// BATCH
-// ============================================================
-async function renderBatch(){
-  const c = document.getElementById("module-content");
-  c.innerHTML = `<div class="loading">Loading products & batch registry…</div>`;
-  try {
-    const [products, registry] = await Promise.all([loadProducts(), safeFetch(BATCH_REGISTRY_SHEET)]);
-    let date = new Date().toISOString().slice(0,10);
-    let entries = [];
-    const entriesToRegistryRow = e => ({ "Batch No": e.batch_no });
-    const emptyRow = () => ({ product:"", productCode:"", batch_no:nextBatchNumber([...(registry||[]), ...entries.map(entriesToRegistryRow)]), batch_size:"", notes:"" });
-    entries = [emptyRow()];
-
-    const yearInfo = () => {
-      const y = new Date().getFullYear(); const prefix = yearPrefix();
-      let maxSeq = 0;
-      [...(registry||[]), ...entries.filter(x=>x.batch_no)].forEach(row => {
-        const bn = String(row["Batch No"] || "").trim();
-        if (bn.startsWith(prefix) && bn.length >= 5) {
-          const seq = parseInt(bn.slice(2), 10);
-          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-        }
-      });
-      return { y, prefix, maxSeq, next: prefix + String(maxSeq + 1).padStart(3, '0') };
-    };
-
-    const root = document.createElement("div");
-    root.innerHTML = `
-      <div class="session-banner" id="btInfo"></div>
-      <div class="entry-row"><label>Date</label><input type="date" id="btDate" value="${date}"/></div>
-      <div id="btEntries"></div>
-      <button class="action-btn purple" id="btAdd" style="width:100%;margin-bottom:12px">+ Add Another Batch</button>
-      <button class="action-btn green" id="btSave" style="width:100%;margin-bottom:16px">💾 Save All Batches</button>
-      <div id="btSync"></div>
-      <div id="btPending"></div>`;
-    c.innerHTML = ""; c.appendChild(root);
-
-    const entriesBox = root.querySelector("#btEntries");
-    const syncBox = root.querySelector("#btSync");
-    const pendingBox = root.querySelector("#btPending");
-    const infoBox = root.querySelector("#btInfo");
-
-    const updateInfo = () => {
-      const y = new Date().getFullYear();
-      const total = (registry||[]).length;
-      const yearTotal = (registry||[]).filter(r => String(r["Batch No"]||"").startsWith(yearPrefix())).length;
-      infoBox.innerHTML = `📅 <b>Year ${y}</b> · Next: <span class="batch-pill">${esc(yearInfo().next)}</span> · This year: ${yearTotal} · Total ever: ${total}`;
-    };
-    root.querySelector("#btDate").addEventListener("input", e => { date = e.target.value; });
-    updateInfo();
-
-    const renderSyncBanner = () => {
-      const pending = getPending(BATCH_STORAGE);
-      if (pending.length === 0) { syncBox.innerHTML = `<div class="ok-banner">✅ No pending batches. All saved.</div>`; return; }
-      syncBox.innerHTML = `<div class="info-banner">${pending.length} pending batch${pending.length===1?"":"es"} waiting to sync.<div style="margin-top:10px"><button class="action-btn orange" id="btSyncNow">🔄 Sync Now</button></div></div>`;
-      const btn = syncBox.querySelector("#btSyncNow");
-      if (btn) btn.onclick = async () => { await syncPending(BATCH_REGISTRY_SHEET, BATCH_STORAGE); renderSyncBanner(); renderPending(); };
-    };
-
-    const renderEntries = () => {
-      entriesBox.innerHTML = entries.map((e, i) => `
-        <div class="entry-card"><h4>Batch ${i+1}${entries.length > 1 ? ` <button class="remove-btn" data-rm="${i}">Remove</button>` : ""}</h4>
-          <div class="entry-row"><label>Product</label>
-            <button class="picker-btn" data-prod="${i}">${e.product ? esc(e.product) : "Tap to choose product"}</button></div>
-          <div class="entry-row"><label>Batch No (auto-suggested — editable)</label>
-            <input data-bn="${i}" value="${esc(e.batch_no)}" placeholder="e.g. 26001" style="font-family:monospace;font-weight:700"/></div>
-          <div class="entry-row"><label>Batch Size</label>
-            <input data-bs="${i}" type="number" inputmode="numeric" value="${esc(e.batch_size)}" placeholder="e.g. 5000"/></div>
-          <div class="entry-row"><label>Notes (optional)</label>
-            <input data-notes="${i}" value="${esc(e.notes||"")}" placeholder="optional"/></div>
-        </div>`).join("");
-      bindEntryHandlers();
-      updateInfo();
-    };
-
-    const bindEntryHandlers = () => {
-      entriesBox.querySelectorAll("[data-prod]").forEach(btn => {
-        btn.onclick = async () => {
-          const i = +btn.getAttribute("data-prod");
-          const names = products.map(p => `${p.code} — ${p.name}`);
-          const picked = await openPicker("Choose Product", names, false);
-          if (picked) {
-            const code = picked.split(" — ")[0];
-            const found = products.find(p => p.code === code);
-            if (found) { entries[i].product = found.name; entries[i].productCode = found.code; renderEntries(); }
-          }
-        };
-      });
-      entriesBox.querySelectorAll("[data-bn]").forEach(inp => { inp.oninput = e => { entries[+e.target.getAttribute("data-bn")].batch_no = e.target.value; }; });
-      entriesBox.querySelectorAll("[data-bs]").forEach(inp => { inp.oninput = e => { entries[+e.target.getAttribute("data-bs")].batch_size = e.target.value; }; });
-      entriesBox.querySelectorAll("[data-notes]").forEach(inp => { inp.oninput = e => { entries[+e.target.getAttribute("data-notes")].notes = e.target.value; }; });
-      entriesBox.querySelectorAll("[data-rm]").forEach(btn => {
-        btn.onclick = () => {
-          const i = +btn.getAttribute("data-rm"); entries.splice(i, 1);
-          if (entries.length === 0) entries.push(emptyRow()); renderEntries();
-        };
-      });
-    };
-
-    const renderPending = () => {
-      const pending = getPending(BATCH_STORAGE);
-      if (pending.length === 0) { pendingBox.innerHTML = ""; return; }
-      pendingBox.innerHTML = `<div style="color:var(--dim);font-size:12px;margin-top:16px;margin-bottom:8px">Pending batches:</div>` +
-        pending.map((p, i) => {
-          const lines = [];
-          Object.keys(p).forEach(k => { if (k === "Created At") return; lines.push(`<div><b>${esc(k)}:</b> ${esc(p[k])}</div>`); });
-          return `<div class="entry-card"><h4>#${i+1} <button class="remove-btn" data-del="${i}">Delete</button></h4><div style="font-size:13px;line-height:1.6">${lines.join("")}</div></div>`;
-        }).join("");
-      pendingBox.querySelectorAll("[data-del]").forEach(btn => {
-        btn.onclick = () => {
-          const i = +btn.getAttribute("data-del"); const list = getPending(BATCH_STORAGE);
-          list.splice(i, 1); savePending(BATCH_STORAGE, list); renderPending(); renderSyncBanner();
-        };
-      });
-    };
-
-    root.querySelector("#btAdd").onclick = () => {
-      const prefix = yearPrefix();
-      let maxSeq = 0;
-      [...(registry||[]), ...entries].forEach(row => {
-        const bn = String(row["Batch No"] || row.batch_no || "").trim();
-        if (bn.startsWith(prefix) && bn.length >= 5) {
-          const seq = parseInt(bn.slice(2), 10);
-          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-        }
-      });
-      const next = prefix + String(maxSeq + 1).padStart(3, '0');
-      entries.push({ product:"", productCode:"", batch_no:next, batch_size:"", notes:"" });
-      renderEntries();
-    };
-
-    root.querySelector("#btSave").onclick = async () => {
-      const d = root.querySelector("#btDate").value || date;
-      const valid = entries.filter(e => e.product && e.batch_no && e.batch_size);
-      if (valid.length === 0) { alert("Fill in at least one complete batch."); return; }
-      const registryNumbers = new Set((registry||[]).map(r => String(r["Batch No"]||"").trim()));
-      const seen = new Set();
-      for (const e of valid) {
-        const bn = String(e.batch_no).trim();
-        if (registryNumbers.has(bn)) { alert(`Batch No "${bn}" already exists.`); return; }
-        if (seen.has(bn)) { alert(`Batch No "${bn}" is used twice.`); return; }
-        seen.add(bn);
-      }
-      const toSave = valid.map(e => ({
-        "Date": d, "Product": e.product, "Product Code": e.productCode,
-        "Batch No": e.batch_no, "Batch Size": e.batch_size,
-        "Notes": e.notes || "", "Created At": new Date().toISOString(),
-      }));
-      const existing = getPending(BATCH_STORAGE);
-      savePending(BATCH_STORAGE, existing.concat(toSave));
-      toSave.forEach(r => registry.push(r));
-      entries = [emptyRow()];
-      renderEntries(); renderPending(); renderSyncBanner(); updateInfo();
-      setStatus("Sending…");
-      const r = await syncPending(BATCH_REGISTRY_SHEET, BATCH_STORAGE);
-      renderSyncBanner(); renderPending();
-      if (r.sent > 0 && r.remaining === 0) alert(`✅ ${r.sent} batch${r.sent===1?"":"es"} saved.`);
-      else if (r.remaining > 0) alert(`⚠️ ${r.remaining} kept on phone. Tap "Sync Now" to retry.`);
-    };
-
-    renderEntries(); renderPending(); renderSyncBanner();
-    setStatus("Production Batch ready");
   } catch(err){
     c.innerHTML = `<div class="err-banner">Failed to load: ${esc(err.message)}</div>
       <button class="back-btn" onclick="goHome()">← Back</button>`;
@@ -1693,7 +1718,7 @@ async function renderDashboard(){
     const monthOutput = packing.reduce((s,r) => s + num(r["Output"]), 0) + filling.reduce((s,r) => s + num(r["Daily Output"]), 0);
     const monthEntries = packing.length + filling.length + shrink.length + coding.length + receipt.length + weighing.length;
 
-    const pendingTotal = getPending("afrab.shrink.pending").length + getPending("afrab.coding.pending").length + getPending("afrab.packing.pending").length + getPending("afrab.filling.pending").length + getPending(RECEIPT_STORAGE).length + getPending(BATCH_STORAGE).length + getPending(WEIGHING_STORAGE).length;
+    const pendingTotal = getPending("afrab.shrink.pending").length + getPending("afrab.coding.pending").length + getPending("afrab.packing.pending").length + getPending("afrab.filling.pending").length + getPending(RECEIPT_STORAGE).length + getPending(WEIGHING_STORAGE).length;
 
     const listHtml = (obj) => {
       const keys = Object.keys(obj);
