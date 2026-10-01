@@ -1513,20 +1513,59 @@ function setReportsEmail(v){
   localStorage.setItem(REPORTS_KEY, v);
 }
 
+const REPORTS_KEY = "afrab.reports.email";
+const REPORTS_SECTIONS_KEY = "afrab.reports.sections";
+
+function getReportsEmail(){
+  return localStorage.getItem(REPORTS_KEY) || "dadatoluwasetitus@protonmail.com";
+}
+function setReportsEmail(v){
+  localStorage.setItem(REPORTS_KEY, v);
+}
+function getReportsSections(){
+  var raw = localStorage.getItem(REPORTS_SECTIONS_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch(e) { return null; }
+}
+function setReportsSections(arr){
+  localStorage.setItem(REPORTS_SECTIONS_KEY, JSON.stringify(arr));
+}
+
+var REPORT_SECTIONS = [
+  { id:"summary",     label:"Executive Summary",            def:true },
+  { id:"top",         label:"Top 10 Products",              def:true },
+  { id:"production",  label:"Production Batches",           def:true },
+  { id:"weighing",    label:"Weighing Sessions",            def:true },
+  { id:"receipt",     label:"Product Receipts",             def:true },
+  { id:"filling",     label:"Filling Entries",              def:true },
+  { id:"packing",     label:"Packing Entries",              def:true },
+  { id:"shrink",      label:"Shrinkwrap Entries",           def:false },
+  { id:"coding",      label:"Coding Entries",               def:false },
+  { id:"expiring",    label:"Materials Expiring (90 days)", def:true }
+];
+
 function renderReports() {
   document.getElementById("module-title").textContent = "Reports";
   const c = document.getElementById("module-content");
   showScreen("screen-module");
 
   const today = todayString();
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0,10);
   let period = "daily";
   let anchor = today;
   let email = getReportsEmail();
   let fullDetail = false;
+  let sections = getReportsSections() || REPORT_SECTIONS.filter(s => s.def).map(s => s.id);
+
+  const sectionsHtml = REPORT_SECTIONS.map(s => `
+    <div class="entry-row">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" data-section="${s.id}" ${sections.indexOf(s.id) >= 0 ? "checked" : ""}/>
+        ${esc(s.label)}
+      </label>
+    </div>`).join("");
 
   c.innerHTML = `
-    <div class="info-banner">Generate and email a GM report. Choose a period, a date, and the recipient.</div>
+    <div class="info-banner">Generate and email a GM report. Choose period, date, recipient, and which sections to include.</div>
 
     <h2>Period</h2>
     <div class="report-grid">
@@ -1548,13 +1587,19 @@ function renderReports() {
     <h2>Recipient</h2>
     <input class="field" id="rp-email" value="${esc(email)}" placeholder="gm@example.com" autocapitalize="none" autocorrect="off" spellcheck="false"/>
 
-    <h2>Detail</h2>
+    <h2>Sections to include</h2>
+    <div class="entry-card" id="rp-sections">${sectionsHtml}</div>
+
+    <h2>Detail level</h2>
     <div class="entry-row">
-      <label><input type="checkbox" id="rp-full" ${fullDetail ? "checked" : ""}/> Include full detail (all batches, not just top 10)</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="rp-full" ${fullDetail ? "checked" : ""}/>
+        Show full detail (all batches, not just top 10)
+      </label>
     </div>
 
     <h2>Preview</h2>
-    <div id="rp-preview"><div class="empty">Pick a period, then tap Preview.</div></div>
+    <div id="rp-preview"><div class="empty">Tap Preview to see what will be sent.</div></div>
 
     <button class="action-btn" id="rp-preview-btn">Preview</button>
     <button class="action-btn green" id="rp-send-btn">📤 Send to GM</button>
@@ -1573,29 +1618,30 @@ function renderReports() {
   c.querySelector("#rp-email").addEventListener("input", e => { email = e.target.value.trim(); });
   c.querySelector("#rp-full").addEventListener("change", e => { fullDetail = e.target.checked; });
 
+  c.querySelectorAll("[data-section]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      sections = Array.from(c.querySelectorAll("[data-section]:checked")).map(x => x.getAttribute("data-section"));
+      setReportsSections(sections);
+    });
+  });
+
   const setAnchor = (val) => { anchor = val; c.querySelector("#rp-anchor").value = val; };
-  c.querySelector("#rp-yesterday").onclick = () => {
-    const d = new Date(Date.now() - 86400000);
-    setAnchor(d.toISOString().slice(0,10));
-  };
-  c.querySelector("#rp-lastweek").onclick = () => {
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    setAnchor(d.toISOString().slice(0,10));
-  };
-  c.querySelector("#rp-lastmonth").onclick = () => {
-    const d = new Date(); d.setMonth(d.getMonth() - 1);
-    setAnchor(d.toISOString().slice(0,10));
-  };
-  c.querySelector("#rp-lastyear").onclick = () => {
-    const d = new Date(); d.setFullYear(d.getFullYear() - 1);
-    setAnchor(d.toISOString().slice(0,10));
-  };
+  c.querySelector("#rp-yesterday").onclick = () => { const d = new Date(Date.now() - 86400000); setAnchor(d.toISOString().slice(0,10)); };
+  c.querySelector("#rp-lastweek").onclick  = () => { const d = new Date(); d.setDate(d.getDate() - 7); setAnchor(d.toISOString().slice(0,10)); };
+  c.querySelector("#rp-lastmonth").onclick = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); setAnchor(d.toISOString().slice(0,10)); };
+  c.querySelector("#rp-lastyear").onclick  = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); setAnchor(d.toISOString().slice(0,10)); };
 
   const preview = async () => {
     const box = document.getElementById("rp-preview");
+    if (!sections.length) { box.innerHTML = `<div class="err-banner">Pick at least one section.</div>`; return; }
     box.innerHTML = `<div class="loading">Building preview…</div>`;
     try {
-      const resp = await apiCall("gmReportPreview", { token: getToken(), period: period, date: anchor });
+      const resp = await apiCall("gmReportPreview", {
+        token: getToken(),
+        period: period,
+        date: anchor,
+        sections: sections.join(",")
+      });
       if (!resp || resp.error) {
         box.innerHTML = `<div class="err-banner">${esc((resp && resp.error) || "Failed")}</div>`;
         return;
@@ -1603,8 +1649,8 @@ function renderReports() {
       const s = resp.summary || {};
       box.innerHTML = `
         <div class="stat-grid">
-          <div class="stat-card accent"><div class="stat-label">Total Batches</div><div class="stat-value">${s.batches || 0}</div></div>
-          <div class="stat-card green"><div class="stat-label">Total Output</div><div class="stat-value">${(s.output || 0).toLocaleString()}</div></div>
+          <div class="stat-card accent"><div class="stat-label">Batches</div><div class="stat-value">${s.batches || 0}</div></div>
+          <div class="stat-card green"><div class="stat-label">Output</div><div class="stat-value">${(s.output || 0).toLocaleString()}</div></div>
           <div class="stat-card orange"><div class="stat-label">Downtime</div><div class="stat-value">${(s.downtimeHours || 0).toFixed(2)} h</div></div>
           <div class="stat-card purple"><div class="stat-label">Weighing</div><div class="stat-value">${s.weighings || 0}</div></div>
         </div>
@@ -1615,9 +1661,11 @@ function renderReports() {
           <div class="list-row"><span class="name">Receipts</span><span class="num">${s.receipts || 0}</span></div>
           <div class="list-row"><span class="name">Filling entries</span><span class="num">${s.fillings || 0}</span></div>
           <div class="list-row"><span class="name">Packing entries</span><span class="num">${s.packings || 0}</span></div>
+          <div class="list-row"><span class="name">Expiring materials</span><span class="num">${s.expiringCount || 0}</span></div>
         </div>
-        <div style="color:var(--dim);font-size:12px">Top products preview shown below in the PDF. ${fullDetail ? "Full detail mode ON" : "Top 10 mode"}</div>
-      `;
+        <div style="color:var(--dim);font-size:12px;margin-top:8px">
+          Sections included: ${sections.join(", ")}
+        </div>`;
     } catch(err) {
       box.innerHTML = `<div class="err-banner">${esc(err.message)}</div>`;
     }
@@ -1627,16 +1675,19 @@ function renderReports() {
 
   c.querySelector("#rp-send-btn").onclick = async () => {
     const msg = document.getElementById("rp-msg");
-    if (!email || email.indexOf("@") === -1) { alert("Enter a valid email address"); return; }
+    if (!email || email.indexOf("@") === -1) { alert("Enter a valid email"); return; }
+    if (!sections.length) { alert("Pick at least one section"); return; }
     setReportsEmail(email);
-    msg.innerHTML = `<div class="info-banner">Sending…</div>`;
+    setReportsSections(sections);
+    msg.innerHTML = `<div class="info-banner">Sending… this may take 20–40 seconds</div>`;
     try {
       const resp = await apiCall("gmReportSend", {
         token: getToken(),
         period: period,
         date: anchor,
         email: email,
-        full: fullDetail ? "1" : "0"
+        full: fullDetail ? "1" : "0",
+        sections: sections.join(",")
       });
       if (!resp || resp.error) {
         msg.innerHTML = `<div class="err-banner">${esc((resp && resp.error) || "Failed")}</div>`;
