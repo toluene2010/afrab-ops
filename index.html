@@ -1505,17 +1505,7 @@ async function removeBOM(productCode, materialCode) {
 // ============================================================
 // REPORTS (GM email)
 // ============================================================
-const REPORTS_KEY = "afrab.reports.email";
-function getReportsEmail(){
-  return localStorage.getItem(REPORTS_KEY) || "dadatoluwasetitus@protonmail.com";
-}
-function setReportsEmail(v){
-  localStorage.setItem(REPORTS_KEY, v);
-}
-
-const REPORTS_KEY = "afrab.reports.email";
 const REPORTS_SECTIONS_KEY = "afrab.reports.sections";
-
 function getReportsEmail(){
   return localStorage.getItem(REPORTS_KEY) || "dadatoluwasetitus@protonmail.com";
 }
