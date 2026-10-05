@@ -203,6 +203,19 @@ function clearAuth(){ localStorage.removeItem(AUTH_KEY); }
 function getToken(){ const a = getAuth(); return a ? a.token : ""; }
 
 // ============================================================
+// HELPERS — SANITIZE
+// ============================================================
+function clean(s){
+  return String(s == null ? "" : s)
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function cleanKey(s){
+  return clean(s).toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+// ============================================================
 // SHA-256
 // ============================================================
 function sha256Hex(str){
@@ -259,26 +272,55 @@ function sha256Hex(str){
 }
 
 // ============================================================
-// API CALL (JSONP)
+// API CALL (JSONP) — with queue + retry
 // ============================================================
+const API_QUEUE = { running: 0, max: 4, queue: [] };
+
 function apiCall(action, params){
   return new Promise((resolve, reject) => {
-    const cb = "afrab_api_" + Math.random().toString(36).slice(2);
-    let done = false, script = null;
-    const cleanup = () => {
-      if (done) return; done = true;
-      try { delete window[cb]; } catch(e){}
-      if (script && script.parentNode) script.parentNode.removeChild(script);
-    };
-    const timer = setTimeout(() => { cleanup(); reject(new Error("Timeout")); }, 30000);
-    window[cb] = (data) => { clearTimeout(timer); cleanup(); resolve(data); };
-    let url = API_BASE + "?action=" + encodeURIComponent(action) + "&callback=" + cb;
-    Object.keys(params || {}).forEach(k => { url += "&" + k + "=" + encodeURIComponent(params[k]); });
-    script = document.createElement("script");
-    script.src = url;
-    script.onerror = () => { clearTimeout(timer); cleanup(); reject(new Error("Network error")); };
-    document.head.appendChild(script);
+    const task = () => new Promise((res, rej) => {
+      const cb = "afrab_api_" + Math.random().toString(36).slice(2);
+      let done = false, script = null;
+      const cleanup = () => {
+        if (done) return; done = true;
+        try { delete window[cb]; } catch(e){}
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+      };
+      const timer = setTimeout(() => { cleanup(); rej(new Error("Timeout")); }, 45000);
+      window[cb] = (data) => { clearTimeout(timer); cleanup(); res(data); };
+      let url = API_BASE + "?action=" + encodeURIComponent(action) + "&callback=" + cb;
+      Object.keys(params || {}).forEach(k => { url += "&" + k + "=" + encodeURIComponent(params[k]); });
+      script = document.createElement("script");
+      script.src = url;
+      script.onerror = () => { clearTimeout(timer); cleanup(); rej(new Error("Network error")); };
+      document.head.appendChild(script);
+    });
+
+    return new Promise((resolve, reject) => {
+      const run = () => {
+        API_QUEUE.running++;
+        task().then(resolve, reject).finally(() => {
+          API_QUEUE.running--;
+          const next = API_QUEUE.queue.shift();
+          if (next) next();
+        });
+      };
+      if (API_QUEUE.running < API_QUEUE.max) run();
+      else API_QUEUE.queue.push(run);
+    });
   });
+}
+
+async function apiCallRetry(action, params, attempts = 3){
+  let lastErr;
+  for (let i = 0; i < attempts; i++){
+    try { return await apiCall(action, params); }
+    catch(e){
+      lastErr = e;
+      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 // ============================================================
@@ -396,13 +438,12 @@ function downtimeToHours(s){
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 // ============================================================
-// FLEXIBLE DATE PARSER (FIXED)
+// FLEXIBLE DATE PARSER
 // ============================================================
 function parseFlexibleDate(str, isExpiry){
   if (!str) return null;
   str = String(str).trim(); if (!str) return null;
 
-  // YYYY-MM-DD or YYYY-MM
   let m = str.match(/^(\d{4})[-\/](\d{1,2})(?:[-\/](\d{1,2}))?$/);
   if (m){
     const y = +m[1], mo = +m[2] - 1;
@@ -410,11 +451,9 @@ function parseFlexibleDate(str, isExpiry){
     return new Date(y, mo, d);
   }
 
-  // DD/MM/YYYY or MM/DD/YYYY or DD.MM.YYYY
   m = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/);
   if (m) return new Date(+m[3], +m[2]-1, +m[1]);
 
-  // MM/YYYY or MM/YY — THE FIX for 05/28, 02/25, 11/27
   m = str.match(/^(\d{1,2})[-\/](\d{2,4})$/);
   if (m){
     const mo = +m[1] - 1;
@@ -424,7 +463,6 @@ function parseFlexibleDate(str, isExpiry){
     return new Date(y, mo, d);
   }
 
-  // Month name + year: June 2029, Jan-2028, Jun/27
   const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
   m = str.match(/^([A-Za-z]{3,})[\s\-\/](\d{2,4})$/);
   if (m){
@@ -437,7 +475,6 @@ function parseFlexibleDate(str, isExpiry){
     }
   }
 
-  // Fallback
   const n = new Date(str);
   return isNaN(n) ? null : n;
 }
@@ -468,7 +505,7 @@ const MODULES = {
 const ROLE_MODULES = {
   packing:["packing"], filling:["filling"], receipt:["receipt"],
   shrink:["shrink"], coding:["coding"],
-  weighing:["weighing","rawmaterials"],
+  weighing:["weighing","rawmaterials","bommanager"],
   admin:["dashboard","packing","filling","receipt","shrink","coding","weighing","rawmaterials","bommanager","reports","admin"],
 };
 
@@ -512,7 +549,7 @@ async function doLogin(){
   document.getElementById("loginErrBox").innerHTML = "";
   try {
     const hash = sha256Hex(pass);
-    const resp = await apiCall("login", { username: user, passhash: hash });
+    const resp = await apiCallRetry("login", { username: user, passhash: hash });
     if (!resp || resp.error) {
       const err = (resp && resp.error) || "Login failed";
       document.getElementById("loginErrBox").innerHTML = `<div class="login-err">${esc(err)}</div>`;
@@ -713,14 +750,14 @@ async function postRows(sheetName, rows){
 async function lookupBatch(batchNo) {
   if (!batchNo) return null;
   try {
-    const resp = await apiCall("lookupBatch", { token: getToken(), batchNo: batchNo });
+    const resp = await apiCallRetry("lookupBatch", { token: getToken(), batchNo: batchNo });
     return resp && resp.ok && resp.found ? resp : null;
   } catch(e) { return null; }
 }
 
 async function productionSaveReceipt(items) {
   try {
-    const resp = await apiCall("receiptSave", { token: getToken(), items: JSON.stringify(items) });
+    const resp = await apiCallRetry("receiptSave", { token: getToken(), items: JSON.stringify(items) });
     return resp || { ok: false, error: "No response" };
   } catch(e) { return { ok: false, error: e.message }; }
 }
@@ -769,9 +806,9 @@ async function loadProducts(forceRefresh){
   const kName = findKey(sample, "product name", "name");
   const kActive = findKey(sample, "active");
   state.products = rows
-    .filter(x => x[kCode] && String(x[kCode]).trim())
-    .filter(x => !kActive || String(x[kActive]||"").trim().toUpperCase() !== "NO")
-    .map(x => ({ code:String(x[kCode]).trim(), name:String(x[kName]||"").trim() }));
+    .filter(x => x[kCode] && clean(x[kCode]))
+    .filter(x => !kActive || clean(x[kActive]).toUpperCase() !== "NO")
+    .map(x => ({ code: clean(x[kCode]), name: clean(x[kName]) }));
   cacheSet("products", state.products);
   return state.products;
 }
@@ -794,8 +831,17 @@ async function loadRawMaterials(forceRefresh){
     const kEXP = findKey(sample, "expir","exp");
     const kStat = findKey(sample, "status");
     state.rawMaterials = rows
-      .filter(x => x[kCode] && String(x[kCode]).trim())
-      .map(x => ({ code:String(x[kCode]||"").trim(), name:String(x[kName]||"").trim(), batch:kBatch?String(x[kBatch]||"").trim():"", qc:String(x[kQC]||"").trim(), mfg:String(x[kMFG]||"").trim(), exp:String(x[kEXP]||"").trim(), status:kStat?String(x[kStat]||"").trim():"Active" }));
+      .filter(x => x[kCode] && clean(x[kCode]))
+      .map(x => ({
+        code: clean(x[kCode]),
+        codeKey: cleanKey(x[kCode]),
+        name: clean(x[kName]),
+        batch: kBatch ? clean(x[kBatch]) : "",
+        qc: clean(x[kQC]),
+        mfg: clean(x[kMFG]),
+        exp: clean(x[kEXP]),
+        status: kStat ? clean(x[kStat]) : "Active"
+      }));
   } catch(e){ state.rawMaterials = []; }
   cacheSet("raw_materials", state.rawMaterials);
   return state.rawMaterials;
@@ -813,7 +859,13 @@ async function loadBOM(forceRefresh){
     const sample = rows[0];
     const kProd = findKey(sample, "product code");
     const kMat = findKey(sample, "material code");
-    state.bom = rows.filter(x => x[kProd] && x[kMat]).map(x => ({ product:String(x[kProd]).trim(), material:String(x[kMat]).trim() }));
+    state.bom = rows
+      .filter(x => x[kProd] && x[kMat])
+      .map(x => ({
+        product: clean(x[kProd]),
+        material: clean(x[kMat]),
+        materialKey: cleanKey(x[kMat])
+      }));
   } catch(e){ state.bom = []; }
   cacheSet("bom", state.bom);
   return state.bom;
@@ -882,6 +934,14 @@ function filterByCategory(list, category){
     const c = String(x.category||"").toLowerCase();
     return !c || c === "both" || c === cat;
   });
+}
+
+// ============================================================
+// FIND MATERIAL — normalized matcher
+// ============================================================
+function findMaterial(state, bomMaterial){
+  const target = cleanKey(bomMaterial);
+  return state.rawMaterials.filter(r => (r.codeKey || cleanKey(r.code)) === target);
 }
 
 // ============================================================
@@ -964,7 +1024,7 @@ async function renderUsers(banner) {
   showScreen("screen-module");
   c.innerHTML = `<div class="loading">Loading users…</div>`;
   try {
-    const resp = await apiCall("listUsers", { token: getToken() });
+    const resp = await apiCallRetry("listUsers", { token: getToken() });
     if (!resp || resp.error) {
       c.innerHTML = `<div class="err-banner">${esc((resp && resp.error) || "Failed")}</div>
         <button class="back-btn" onclick="goHome()">← Back</button>`;
@@ -1029,7 +1089,7 @@ async function addNewUser(){
   if (passcode.length < 6) { alert("Passcode must be at least 6 characters"); return; }
   const hash = sha256Hex(passcode);
   try {
-    const resp = await apiCall("addUser", { token: getToken(), newUsername: username, newName: name, newPasshash: hash, newRole: role });
+    const resp = await apiCallRetry("addUser", { token: getToken(), newUsername: username, newName: name, newPasshash: hash, newRole: role });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     renderUsers(`<div class="ok-banner">✅ User added</div>`);
   } catch(err) { alert(err.message); }
@@ -1037,7 +1097,7 @@ async function addNewUser(){
 
 async function toggleUserActive(username, active){
   try {
-    const resp = await apiCall("setActive", { token: getToken(), targetUser: username, active: active ? "true" : "false" });
+    const resp = await apiCallRetry("setActive", { token: getToken(), targetUser: username, active: active ? "true" : "false" });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     renderUsers(`<div class="ok-banner">✅ Updated</div>`);
   } catch(err) { alert(err.message); }
@@ -1049,7 +1109,7 @@ async function resetUserPass(username){
   if (newPass.length < 6) { alert("Passcode must be at least 6 characters"); return; }
   const hash = sha256Hex(newPass);
   try {
-    const resp = await apiCall("resetPass", { token: getToken(), targetUser: username, newPasshash: hash });
+    const resp = await apiCallRetry("resetPass", { token: getToken(), targetUser: username, newPasshash: hash });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     alert("✅ Passcode reset");
   } catch(err) { alert(err.message); }
@@ -1064,7 +1124,7 @@ async function renderProductionViewer(){
   showScreen("screen-module");
   c.innerHTML = `<div class="loading">Loading production…</div>`;
   try {
-    const resp = await apiCall("listProduction", { token: getToken() });
+    const resp = await apiCallRetry("listProduction", { token: getToken() });
     if (!resp || resp.error) { c.innerHTML = `<div class="err-banner">${esc((resp&&resp.error)||"Failed")}</div>`; return; }
     const rows = resp.rows || [];
     const completed = rows.filter(r => r.hasYield).length;
@@ -1116,7 +1176,7 @@ function renderArchiveProduction(){
     const msg = document.getElementById("archMsg");
     msg.innerHTML = `<div class="info-banner">Working…</div>`;
     try {
-      const resp = await apiCall("archiveProduction", { token: getToken() });
+      const resp = await apiCallRetry("archiveProduction", { token: getToken() });
       if (!resp || resp.error) { msg.innerHTML = `<div class="err-banner">${esc((resp&&resp.error)||"Failed")}</div>`; return; }
       msg.innerHTML = `<div class="ok-banner">✅ Archived ${resp.archived} batch(es) to <b>${esc(resp.sheetName)}</b></div>`;
     } catch(err) {
@@ -1147,7 +1207,7 @@ async function renderBatchTrace() {
     if (!bn) { box.innerHTML = ""; return; }
     box.innerHTML = `<div class="loading">Loading…</div>`;
     try {
-      const resp = await apiCall("listBatchIngredients", { token: getToken(), batchNo: bn });
+      const resp = await apiCallRetry("listBatchIngredients", { token: getToken(), batchNo: bn });
       if (!resp || resp.error) { box.innerHTML = `<div class="err-banner">${esc((resp && resp.error) || "Failed")}</div>`; return; }
       const rows = resp.rows || [];
       if (!rows.length) { box.innerHTML = `<div class="empty">No materials recorded for batch ${esc(bn)}.</div>`; return; }
@@ -1183,7 +1243,7 @@ async function renderBatchTrace() {
 async function voidIngredientRow(productionBatch, materialCode, materialBatch, qcNo) {
   if (!confirm(`Void ${materialCode} from batch ${productionBatch}?\n\nThis will set the raw material back to "active".`)) return;
   try {
-    const resp = await apiCall("voidIngredient", {
+    const resp = await apiCallRetry("voidIngredient", {
       token: getToken(),
       productionBatch: productionBatch,
       materialCode: materialCode,
@@ -1220,7 +1280,7 @@ async function renderMaterialUsage() {
     if (!code) { box.innerHTML = ""; return; }
     box.innerHTML = `<div class="loading">Loading…</div>`;
     try {
-      const resp = await apiCall("listMaterialUsage", { token: getToken(), materialCode: code });
+      const resp = await apiCallRetry("listMaterialUsage", { token: getToken(), materialCode: code });
       if (!resp || resp.error) { box.innerHTML = `<div class="err-banner">${esc((resp && resp.error) || "Failed")}</div>`; return; }
       const rows = resp.rows || [];
       if (!rows.length) { box.innerHTML = `<div class="empty">No usage found for ${esc(code)}.</div>`; return; }
@@ -1253,7 +1313,7 @@ async function renderRawMaterialsEditor() {
   showScreen("screen-module");
   c.innerHTML = `<div class="loading">Loading raw materials…</div>`;
   try {
-    const resp = await apiCall("listRawMaterialsAdmin", { token: getToken() });
+    const resp = await apiCallRetry("listRawMaterialsAdmin", { token: getToken() });
     if (!resp || resp.error) {
       c.innerHTML = `<div class="err-banner">${esc((resp && resp.error) || "Failed")}</div>
         <button class="back-btn" onclick="goHome()">← Back</button>`;
@@ -1356,7 +1416,7 @@ function openRawMaterialEditor(rowNum) {
     const exp = panel.querySelector("#rm-exp").value.trim();
     const status = panel.querySelector("#rm-status").value;
     try {
-      const resp = await apiCall("updateRawMaterial", {
+      const resp = await apiCallRetry("updateRawMaterial", {
         token: getToken(),
         row: rowNum,
         batchNo: batchNo,
@@ -1376,7 +1436,7 @@ function openRawMaterialEditor(rowNum) {
 
 async function quickStatusFlip(rowNum, newStatus) {
   try {
-    const resp = await apiCall("setMaterialStatus", {
+    const resp = await apiCallRetry("setMaterialStatus", {
       token: getToken(),
       row: rowNum,
       status: newStatus
@@ -1389,7 +1449,7 @@ async function quickStatusFlip(rowNum, newStatus) {
 }
 
 // ============================================================
-// BOM MANAGER (admin only)
+// BOM MANAGER (admin + weighing)
 // ============================================================
 async function renderBOMManager() {
   document.getElementById("module-title").textContent = "BOM Manager";
@@ -1425,14 +1485,16 @@ async function renderBOMManager() {
 async function openBOMForProduct(productCode) {
   document.getElementById("module-title").textContent = "BOM Editor";
   const c = document.getElementById("module-content");
-  const product = state.products.find(p => p.code === productCode);
+  const product = state.products.find(p => p.code === productCode) || { code: productCode, name: productCode };
   showScreen("screen-module");
   c.innerHTML = `<div class="loading">Loading BOM…</div>`;
 
   try {
+    // Ensure fresh materials + codes
+    await loadRawMaterials(true);
     const [bomResp, codesResp] = await Promise.all([
-      apiCall("listBOM", { token: getToken(), productCode: productCode }),
-      apiCall("listMaterialCodes", { token: getToken() })
+      apiCallRetry("listBOM", { token: getToken(), productCode: productCode }),
+      apiCallRetry("listMaterialCodes", { token: getToken() })
     ]);
     if (!bomResp || bomResp.error) { c.innerHTML = `<div class="err-banner">${esc((bomResp && bomResp.error)||"Failed")}</div>`; return; }
     const materials = bomResp.materials || [];
@@ -1453,7 +1515,7 @@ async function openBOMForProduct(productCode) {
       const box = document.getElementById("bom-materials");
       if (!materials.length) { box.innerHTML = `<div class="empty">No materials yet.</div>`; return; }
       box.innerHTML = materials.map(code => {
-        const rec = state.rawMaterials.find(r => r.code === code);
+        const rec = state.rawMaterials.find(r => cleanKey(r.code) === cleanKey(code));
         const name = rec ? rec.name : "";
         return `
           <div class="product-item" style="display:flex;justify-content:space-between;align-items:center">
@@ -1469,7 +1531,7 @@ async function openBOMForProduct(productCode) {
 
     document.getElementById("bom-add").onclick = async () => {
       const items = availableCodes
-        .filter(c => materials.indexOf(c.code) === -1)
+        .filter(c => !materials.some(m => cleanKey(m) === cleanKey(c.code)))
         .map(c => `${c.code} — ${c.name}`);
       if (!items.length) { alert("No more materials available to add."); return; }
       const picked = await openPicker("Add Material to BOM", items, false);
@@ -1478,7 +1540,7 @@ async function openBOMForProduct(productCode) {
       const msg = document.getElementById("bom-msg");
       msg.innerHTML = `<div class="info-banner">Adding…</div>`;
       try {
-        const resp = await apiCall("addBOMEntry", { token: getToken(), productCode: productCode, materialCode: code });
+        const resp = await apiCallRetry("addBOMEntry", { token: getToken(), productCode: productCode, materialCode: code });
         if (!resp || resp.error) { msg.innerHTML = `<div class="err-banner">${esc((resp && resp.error)||"Failed")}</div>`; return; }
         materials.push(code);
         cacheClear("bom"); state.bom = [];
@@ -1495,7 +1557,7 @@ async function openBOMForProduct(productCode) {
 async function removeBOM(productCode, materialCode) {
   if (!confirm(`Remove ${materialCode} from this BOM?`)) return;
   try {
-    const resp = await apiCall("removeBOMEntry", { token: getToken(), productCode: productCode, materialCode: materialCode });
+    const resp = await apiCallRetry("removeBOMEntry", { token: getToken(), productCode: productCode, materialCode: materialCode });
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     cacheClear("bom"); state.bom = [];
     openBOMForProduct(productCode);
@@ -1627,7 +1689,7 @@ function renderReports() {
     if (!sections.length) { box.innerHTML = `<div class="err-banner">Pick at least one section.</div>`; return; }
     box.innerHTML = `<div class="loading">Building preview…</div>`;
     try {
-      const resp = await apiCall("gmReportPreview", {
+      const resp = await apiCallRetry("gmReportPreview", {
         token: getToken(),
         period: period,
         date: anchor,
@@ -1672,7 +1734,7 @@ function renderReports() {
     setReportsSections(sections);
     msg.innerHTML = `<div class="info-banner">Sending… this may take 20–40 seconds</div>`;
     try {
-      const resp = await apiCall("gmReportSend", {
+      const resp = await apiCallRetry("gmReportSend", {
         token: getToken(),
         period: period,
         date: anchor,
@@ -1692,13 +1754,17 @@ function renderReports() {
 }
 
 // ============================================================
-// WEIGHING
+// WEIGHING — PRODUCT PICKER (force-refresh data)
 // ============================================================
 async function renderWeighingProductPicker(){
   const c = document.getElementById("module-content");
   c.innerHTML = `<div class="loading">Loading products & BOM…</div>`;
   try {
-    const [products, , bom] = await Promise.all([loadProducts(), loadRawMaterials(), loadBOM()]);
+    // Force fresh data
+    const products = await loadProducts(true);
+    await loadRawMaterials(true);
+    await loadBOM(true);
+    const bom = state.bom;
     const productsWithBOM = new Set(bom.map(x => x.product));
     c.innerHTML = `
       <div class="info-banner">${productsWithBOM.size} of ${products.length} products have a BOM.</div>
@@ -1706,7 +1772,7 @@ async function renderWeighingProductPicker(){
       <div id="w-list"></div>`;
     const render = (q="") => {
       const list = document.getElementById("w-list");
-      const query = q.trim().toLowerCase();
+      const query = clean(q).toLowerCase();
       const items = query ? products.filter(x => x.name.toLowerCase().includes(query) || x.code.toLowerCase().includes(query)) : products;
       if (!items.length) { list.innerHTML = `<div class="empty">No products match.</div>`; return; }
       list.innerHTML = items.map(p => {
@@ -1726,9 +1792,12 @@ async function renderWeighingProductPicker(){
   }
 }
 
+// ============================================================
+// WEIGHING — PRODUCT SCREEN
+// ============================================================
 async function showWeighingForProduct(productCode){
   const c = document.getElementById("module-content");
-  const product = state.products.find(p => p.code === productCode);
+  const product = state.products.find(p => p.code === productCode) || { code: productCode, name: productCode };
   state.currentProduct = product;
   const bomItems = state.bom.filter(b => b.product === productCode);
   const today = new Date();
@@ -1741,7 +1810,7 @@ async function showWeighingForProduct(productCode){
   const renderPage = () => {
     try {
       const materials = bomItems.map(b => {
-        const all = state.rawMaterials.filter(r => r.code === b.material);
+        const all = findMaterial(state, b.material);
         const enriched = all.map(r => ({ ...r, sheetFinished:(r.status||"").trim().toLowerCase() === "finished" }));
         const active = enriched.filter(r => !r.sheetFinished);
         const finishedList = enriched.filter(r => r.sheetFinished);
@@ -1772,7 +1841,8 @@ async function showWeighingForProduct(productCode){
           <div class="entry-row" style="margin-bottom:0"><label>Weighed by (your name)</label>
             <input id="wStaff" value="${esc(sessionStaff)}" placeholder="Your name"/></div>
         </div>
-        <button class="action-btn green" id="wPrintBOM" style="margin-bottom:14px">🖨️ Print BOM</button>`;
+        <button class="action-btn green" id="wPrintBOM" style="margin-bottom:8px">🖨️ Print BOM</button>
+        <button class="action-btn purple" id="wManageBOM" style="margin-bottom:14px">🔧 Manage BOM</button>`;
 
       if (materials.length === 0){
         html += `<div class="info-banner"><b>No BOM on file — you can still log this batch.</b><br>Enter batch no, batch size, and your name above, then tap Confirm.</div>`;
@@ -1781,6 +1851,7 @@ async function showWeighingForProduct(productCode){
         </div>`;
         c.innerHTML = html;
         c.querySelector("#wPrintBOM").onclick = () => printBOM(productCode);
+        c.querySelector("#wManageBOM").onclick = () => openBOMForProduct(productCode);
         c.querySelector("#wBatch").addEventListener("input", e => sessionBatch = e.target.value);
         c.querySelector("#wBatchSize").addEventListener("input", e => sessionBatchSize = e.target.value);
         c.querySelector("#wStaff").addEventListener("input", e => sessionStaff = e.target.value);
@@ -1800,8 +1871,23 @@ async function showWeighingForProduct(productCode){
             MATERIAL ${idx+1} of ${materials.length}${totalActive > 1 ? ` — ${totalActive} active batches` : ""}
           </div>`;
         if (m.active.length === 0 && m.finishedList.length === 0) {
-          html += `<div class="material-card expired"><div class="mat-code">${esc(m.materialCode)}</div>
-            <div class="mat-name">Not in Raw Materials sheet</div></div>`;
+          // Not found — show diagnostic
+          const targetKey = cleanKey(m.materialCode);
+          const prefix = targetKey.slice(0, 4);
+          const similar = state.rawMaterials
+            .filter(r => {
+              const k = r.codeKey || cleanKey(r.code);
+              return (prefix && k.startsWith(prefix)) || (r.name||"").toLowerCase().includes(String(m.materialCode).toLowerCase());
+            })
+            .slice(0, 5)
+            .map(r => r.code)
+            .join(", ");
+          html += `<div class="material-card expired">
+            <div class="mat-code">${esc(m.materialCode)}</div>
+            <div class="mat-name">Not in Raw Materials sheet</div>
+            ${similar ? `<div style="font-size:11px;color:var(--dim);margin-top:6px">Similar codes: ${esc(similar)}</div>` : ""}
+            <button class="edit-btn" onclick="renderBOMManager()">🔧 Manage BOM</button>
+          </div>`;
         } else if (m.active.length === 0) {
           html += `<div class="material-card done"><div class="mat-code">${esc(m.materialCode)}</div>
             <div class="mat-name">✓ All batches finished (${m.finishedList.length})</div></div>`;
@@ -1846,6 +1932,7 @@ async function showWeighingForProduct(productCode){
       c.querySelector("#wBatchSize").addEventListener("input", e => sessionBatchSize = e.target.value);
       c.querySelector("#wStaff").addEventListener("input", e => sessionStaff = e.target.value);
       c.querySelector("#wPrintBOM").onclick = () => printBOM(productCode);
+      c.querySelector("#wManageBOM").onclick = () => openBOMForProduct(productCode);
       c.querySelectorAll("[data-tick]").forEach(btn => {
         btn.onclick = () => {
           const key = btn.getAttribute("data-tick");
@@ -1874,12 +1961,12 @@ async function showWeighingForProduct(productCode){
 }
 
 function editWeighingMaterial(code, batch, qc) {
-  apiCall("listRawMaterialsAdmin", { token: getToken() }).then(resp => {
+  apiCallRetry("listRawMaterialsAdmin", { token: getToken() }).then(resp => {
     if (!resp || resp.error) { alert((resp && resp.error) || "Failed"); return; }
     const hit = (resp.rows || []).find(r =>
-      String(r["Material Code"]||"") === code &&
-      String(r["Batch No"]||"") === String(batch||"") &&
-      String(r["QC No"]||"") === String(qc||"")
+      cleanKey(r["Material Code"]) === cleanKey(code) &&
+      cleanKey(r["Batch No"]) === cleanKey(batch) &&
+      cleanKey(r["QC No"]) === cleanKey(qc)
     );
     if (!hit) { alert("Material row not found"); return; }
     openRawMaterialEditorOnWeighing(hit._row, hit);
@@ -1916,7 +2003,7 @@ function openRawMaterialEditorOnWeighing(rowNum, rec) {
   panel.querySelector("#rm-cancel").onclick = () => overlay.remove();
   panel.querySelector("#rm-save").onclick = async () => {
     try {
-      const resp = await apiCall("updateRawMaterial", {
+      const resp = await apiCallRetry("updateRawMaterial", {
         token: getToken(),
         row: rowNum,
         batchNo: panel.querySelector("#rm-batch").value.trim(),
@@ -1929,7 +2016,10 @@ function openRawMaterialEditorOnWeighing(rowNum, rec) {
       overlay.remove();
       cacheClear("raw_materials");
       state.rawMaterials = [];
-      if (state.currentProduct) showWeighingForProduct(state.currentProduct.code);
+      if (state.currentProduct) {
+        await loadRawMaterials(true);
+        showWeighingForProduct(state.currentProduct.code);
+      }
     } catch(err) { alert(err.message); }
   };
 }
@@ -1946,9 +2036,9 @@ async function confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionSt
 
   const enriched = (tickedMaterials || []).map(m => {
     const rec = state.rawMaterials.find(r =>
-      r.code === m.code &&
-      String(r.qc||"") === String(m.qc||"") &&
-      String(r.batch||"") === String(m.batch||"")
+      cleanKey(r.code) === cleanKey(m.code) &&
+      cleanKey(r.qc||"") === cleanKey(m.qc||"") &&
+      cleanKey(r.batch||"") === cleanKey(m.batch||"")
     );
     return {
       code: m.code,
@@ -1962,7 +2052,7 @@ async function confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionSt
 
   setStatus("Sending…");
   try {
-    const resp = await apiCall("weighConfirm", {
+    const resp = await apiCallRetry("weighConfirm", {
       token: getToken(),
       date: todayString(),
       productCode: product.code,
@@ -1980,6 +2070,7 @@ async function confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionSt
     alert(`✅ Weighing logged.\n\nBatch ${bn}\nBatch Size ${bs}\n${enriched.length} material(s)\nWeighed by ${who}`);
     cacheClear("raw_materials");
     state.rawMaterials = [];
+    await loadRawMaterials(true);
     renderWeighingProductPicker();
   } catch(err) {
     alert("⚠️ " + err.message);
@@ -1991,7 +2082,7 @@ async function confirmWeigh({ product, sessionBatch, sessionBatchSize, sessionSt
 // PRINT BOM
 // ============================================================
 function printBOM(productCode){
-  const product = state.products.find(p => p.code === productCode);
+  const product = state.products.find(p => p.code === productCode) || { code: productCode, name: productCode };
   const bomItems = state.bom.filter(b => b.product === productCode);
   const co = getCompany();
   const today = new Date();
@@ -1999,8 +2090,7 @@ function printBOM(productCode){
   const timeStr = today.toTimeString().slice(0,5);
   const rows = [];
   bomItems.forEach((b, idx) => {
-    const all = state.rawMaterials.filter(r => r.code === b.material);
-    const active = all.filter(r => {
+    const active = findMaterial(state, b.material).filter(r => {
       const s = (r.status||"").toLowerCase();
       return s !== "finished" && s !== "expired";
     });
